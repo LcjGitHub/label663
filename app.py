@@ -500,6 +500,8 @@ initial_video_detail = create_video_detail_card(None, initial_data)
 
 app.layout = html.Div([
     dcc.Download(id='download-csv'),
+    dcc.Store(id='selected-video-store', data=None),
+    dcc.Store(id='scroll-trigger', data=0),
     html.Div(
         className='header',
         children=[
@@ -919,11 +921,11 @@ app.layout = html.Div([
      Output('pie-chart', 'figure'),
      Output('video-data-table', 'data'),
      Output('ranking-sidebar', 'children'),
-     Output('video-detail-card', 'children')],
-    [Input('time-period-dropdown', 'value')],
-    [State('pie-chart', 'clickData')]
+     Output('video-detail-card', 'children'),
+     Output('selected-video-store', 'data')],
+    [Input('time-period-dropdown', 'value')]
 )
-def update_dashboard(selected_period, pie_click_data):
+def update_dashboard(selected_period):
     data = get_data_by_period(selected_period)
 
     total_likes = f'{sum(data["likes"]):,}'
@@ -936,12 +938,9 @@ def update_dashboard(selected_period, pie_click_data):
     table_data = create_table_data(data)
     ranking_panel = create_ranking_panel(data)
 
-    selected_video = None
-    if pie_click_data and 'points' in pie_click_data and len(pie_click_data['points']) > 0:
-        selected_video = pie_click_data['points'][0].get('label')
-    video_detail = create_video_detail_card(selected_video, data)
+    video_detail = create_video_detail_card(None, data)
 
-    return total_likes, total_comments, total_shares, total_interactions, figure, pie_figure, table_data, ranking_panel, video_detail
+    return total_likes, total_comments, total_shares, total_interactions, figure, pie_figure, table_data, ranking_panel, video_detail, None
 
 
 @app.callback(
@@ -965,22 +964,50 @@ def export_csv(n_clicks, selected_period):
 
 
 @app.callback(
-    Output('video-detail-card', 'children', allow_duplicate=True),
+    [Output('selected-video-store', 'data', allow_duplicate=True),
+     Output('scroll-trigger', 'data', allow_duplicate=True)],
     [Input('pie-chart', 'clickData')],
+    [State('scroll-trigger', 'data')],
+    prevent_initial_call=True
+)
+def handle_pie_click(click_data, current_scroll_trigger):
+    if click_data is None or 'points' not in click_data or len(click_data['points']) == 0:
+        return no_update, no_update
+
+    selected_video = click_data['points'][0].get('label')
+    return selected_video, current_scroll_trigger + 1
+
+
+@app.callback(
+    Output('video-detail-card', 'children', allow_duplicate=True),
+    [Input('selected-video-store', 'data')],
     [State('time-period-dropdown', 'value')],
     prevent_initial_call=True
 )
-def update_video_detail_from_pie(click_data, selected_period):
+def update_video_detail_from_store(selected_video, selected_period):
     data = get_data_by_period(selected_period)
-
-    if click_data is None or 'points' not in click_data or len(click_data['points']) == 0:
-        return create_video_detail_card(None, data)
-
-    selected_video = click_data['points'][0].get('label')
     return create_video_detail_card(selected_video, data)
+
+
+app.clientside_callback(
+    """
+    function(scroll_trigger) {
+        if (scroll_trigger > 0) {
+            const detailContainer = document.getElementById('video-detail-container');
+            if (detailContainer) {
+                detailContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('scroll-trigger', 'data', allow_duplicate=True),
+    [Input('scroll-trigger', 'data')],
+    prevent_initial_call=True
+)
 
 
 if __name__ == '__main__':
     print("启动内容互动分析页面...")
-    print("访问地址：http://127.0.0.1:8051")
-    app.run(debug=True, host='127.0.0.1', port=8051)
+    print("访问地址：http://127.0.0.1:8050")
+    app.run(debug=True, host='127.0.0.1', port=8050)
