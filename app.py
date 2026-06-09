@@ -3,13 +3,59 @@ from dash import html, dcc, dash_table, Input, Output, State, no_update
 import plotly.graph_objects as go
 import numpy as np
 from mock_data import get_data_by_period, TIME_PERIOD_DATA, CATEGORIES, VIDEO_CATEGORIES, VIDEO_SECONDARY_CATEGORIES
-from utils import calculate_rankings, format_ranking_items, get_aggregated_trend_data, format_number, calculate_growth_rates, calculate_growth_rankings, format_trend
+from utils import (
+    calculate_rankings, format_ranking_items, get_aggregated_trend_data,
+    format_number, calculate_growth_rates, calculate_growth_rankings, format_trend,
+    ColorTheme, FontConfig, LayoutConfig
+)
 from export_utils import export_data_to_csv, export_data_to_excel
 from category_utils import filter_data_by_category, get_category_summary_rows, get_category_bar_traces, filter_all_periods_by_category, get_secondary_categories
 from data_timer import data_timer
 
 app = dash.Dash(__name__)
 app.title = "内容互动分析"
+
+
+def apply_common_layout(fig, title_text, xaxis_title=None, yaxis_title=None,
+                        legend_y=None, legend_large=False, title_large=False,
+                        hovermode=None, barmode=None, height=500,
+                        margin=None, showlegend=True):
+    layout_kwargs = {
+        'title': LayoutConfig.get_title_config(title_text, large=title_large),
+        'showlegend': showlegend,
+        'plot_bgcolor': LayoutConfig.PLOT_BGCOLOR,
+        'paper_bgcolor': LayoutConfig.PAPER_BGCOLOR,
+        'font': FontConfig.get_font(),
+        'height': height
+    }
+
+    if xaxis_title is not None:
+        layout_kwargs['xaxis_title'] = LayoutConfig.get_axis_title_config(xaxis_title)
+    if yaxis_title is not None:
+        layout_kwargs['yaxis_title'] = LayoutConfig.get_axis_title_config(yaxis_title)
+    if hovermode is not None:
+        layout_kwargs['hovermode'] = hovermode
+    if barmode is not None:
+        layout_kwargs['barmode'] = barmode
+    if showlegend:
+        layout_kwargs['legend'] = LayoutConfig.get_legend_config(y=legend_y, large=legend_large)
+    if margin is not None:
+        layout_kwargs['margin'] = margin
+
+    fig.update_layout(**layout_kwargs)
+
+    if xaxis_title is not None:
+        fig.update_xaxes(
+            tickfont=FontConfig.get_tick_font(),
+            gridcolor=ColorTheme.GRID_COLOR
+        )
+    if yaxis_title is not None:
+        fig.update_yaxes(
+            tickfont=FontConfig.get_tick_font(),
+            gridcolor=ColorTheme.GRID_COLOR
+        )
+
+    return fig
 
 
 def create_chart_figure(data):
@@ -24,7 +70,7 @@ def create_chart_figure(data):
         x=categories,
         y=likes,
         name='点赞',
-        marker_color='#FF6B6B',
+        marker_color=ColorTheme.LIKES,
         hovertemplate='<b>%{x}</b><br>点赞： %{y}<extra></extra>'
     ))
 
@@ -32,7 +78,7 @@ def create_chart_figure(data):
         x=categories,
         y=comments,
         name='评论',
-        marker_color='#4ECDC4',
+        marker_color=ColorTheme.COMMENTS,
         hovertemplate='<b>%{x}</b><br>评论： %{y}<extra></extra>'
     ))
 
@@ -40,50 +86,21 @@ def create_chart_figure(data):
         x=categories,
         y=shares,
         name='分享',
-        marker_color='#FFE66D',
+        marker_color=ColorTheme.SHARES,
         hovertemplate='<b>%{x}</b><br>分享： %{y}<extra></extra>'
     ))
 
-    fig.update_layout(
-        title={
-            'text': '内容互动数据分析',
-            'font': {'size': 24, 'family': 'Microsoft YaHei', 'color': '#2C3E50'},
-            'y': 0.95,
-            'x': 0.5
-        },
-        xaxis_title={
-            'text': '视频名称',
-            'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
-        },
-        yaxis_title={
-            'text': '互动数量',
-            'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
-        },
+    apply_common_layout(
+        fig,
+        title_text='内容互动数据分析',
+        xaxis_title='视频名称',
+        yaxis_title='互动数量',
         barmode='stack',
         hovermode='x unified',
-        showlegend=True,
-        legend={
-            'orientation': 'h',
-            'y': 1.02,
-            'x': 0.5,
-            'xanchor': 'center',
-            'font': {'size': 12, 'family': 'Microsoft YaHei'}
-        },
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font={'family': 'Microsoft YaHei'},
-        margin={'t': 80, 'l': 60, 'r': 40, 'b': 60},
-        height=600
-    )
-
-    fig.update_xaxes(
-        tickfont={'family': 'Microsoft YaHei', 'size': 12, 'color': '#34495E'},
-        gridcolor='rgba(0,0,0,0.1)'
-    )
-
-    fig.update_yaxes(
-        tickfont={'family': 'Microsoft YaHei', 'size': 12, 'color': '#34495E'},
-        gridcolor='rgba(0,0,0,0.1)'
+        legend_y=1.02,
+        title_large=True,
+        height=600,
+        margin=LayoutConfig.get_margin(t=80)
     )
 
     return fig
@@ -135,7 +152,7 @@ def create_trend_chart_figure(all_periods_data=None, trend_data=None):
         y=total_likes,
         mode='lines+markers',
         name='点赞合计',
-        line=dict(color='#FF6B6B', width=3),
+        line=dict(color=ColorTheme.LIKES, width=3),
         marker=dict(size=10),
         hovertemplate='<b>%{x}</b><br>点赞合计：%{y:,}<extra></extra>'
     ))
@@ -145,7 +162,7 @@ def create_trend_chart_figure(all_periods_data=None, trend_data=None):
         y=total_comments,
         mode='lines+markers',
         name='评论合计',
-        line=dict(color='#4ECDC4', width=3),
+        line=dict(color=ColorTheme.COMMENTS, width=3),
         marker=dict(size=10),
         hovertemplate='<b>%{x}</b><br>评论合计：%{y:,}<extra></extra>'
     ))
@@ -155,50 +172,21 @@ def create_trend_chart_figure(all_periods_data=None, trend_data=None):
         y=total_shares,
         mode='lines+markers',
         name='分享合计',
-        line=dict(color='#FFE66D', width=3),
+        line=dict(color=ColorTheme.SHARES, width=3),
         marker=dict(size=10),
         hovertemplate='<b>%{x}</b><br>分享合计：%{y:,}<extra></extra>'
     ))
 
-    fig.update_layout(
-        title={
-            'text': '互动趋势分析',
-            'font': {'size': 20, 'family': 'Microsoft YaHei', 'color': '#2C3E50'},
-            'y': 0.95,
-            'x': 0.5
-        },
-        xaxis_title={
-            'text': '时间段',
-            'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
-        },
-        yaxis_title={
-            'text': '互动合计数量',
-            'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
-        },
+    apply_common_layout(
+        fig,
+        title_text='互动趋势分析',
+        xaxis_title='时间段',
+        yaxis_title='互动合计数量',
         hovermode='x unified',
-        showlegend=True,
-        legend={
-            'orientation': 'h',
-            'y': -0.2,
-            'x': 0.5,
-            'xanchor': 'center',
-            'font': {'size': 13, 'family': 'Microsoft YaHei'}
-        },
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font={'family': 'Microsoft YaHei'},
-        margin={'t': 60, 'l': 60, 'r': 40, 'b': 100},
-        height=450
-    )
-
-    fig.update_xaxes(
-        tickfont={'family': 'Microsoft YaHei', 'size': 12, 'color': '#34495E'},
-        gridcolor='rgba(0,0,0,0.1)'
-    )
-
-    fig.update_yaxes(
-        tickfont={'family': 'Microsoft YaHei', 'size': 12, 'color': '#34495E'},
-        gridcolor='rgba(0,0,0,0.1)'
+        legend_y=-0.2,
+        legend_large=True,
+        height=450,
+        margin=LayoutConfig.get_margin(b=100)
     )
 
     return fig
@@ -215,38 +203,22 @@ def create_pie_chart_figure(data):
         total = likes[i] + comments[i] + shares[i]
         total_interactions.append(total)
 
-    colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#9B59B6', '#3498DB', '#E67E22', '#1ABC9C', '#E74C3C']
-
     fig = go.Figure(data=[go.Pie(
         labels=videos,
         values=total_interactions,
         hole=0.3,
-        marker=dict(colors=colors[:len(videos)]),
+        marker=dict(colors=ColorTheme.get_pie_colors(len(videos))),
         textinfo='label+percent',
-        textfont={'family': 'Microsoft YaHei', 'size': 12},
+        textfont=FontConfig.get_font(size=FontConfig.TEXT_SIZE),
         hovertemplate='<b>%{label}</b><br>互动数：%{value:,}<br>占比：%{percent}<extra></extra>'
     )])
 
-    fig.update_layout(
-        title={
-            'text': '各视频互动数占比',
-            'font': {'size': 20, 'family': 'Microsoft YaHei', 'color': '#2C3E50'},
-            'y': 0.95,
-            'x': 0.5
-        },
-        showlegend=True,
-        legend={
-            'orientation': 'h',
-            'y': -0.1,
-            'x': 0.5,
-            'xanchor': 'center',
-            'font': {'size': 12, 'family': 'Microsoft YaHei'}
-        },
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font={'family': 'Microsoft YaHei'},
-        margin={'t': 60, 'l': 40, 'r': 40, 'b': 80},
-        height=500
+    apply_common_layout(
+        fig,
+        title_text='各视频互动数占比',
+        legend_y=-0.1,
+        height=500,
+        margin=LayoutConfig.get_margin(t=60, l=40, r=40, b=80)
     )
 
     return fig
@@ -262,7 +234,7 @@ def create_category_bar_chart_figure(data, primary_category='all', secondary_cat
         x=avg_likes,
         name='平均点赞',
         orientation='h',
-        marker_color='#FF6B6B',
+        marker_color=ColorTheme.LIKES,
         hovertemplate='<b>%{y}</b><br>平均点赞： %{x:,}<extra></extra>'
     ))
 
@@ -271,7 +243,7 @@ def create_category_bar_chart_figure(data, primary_category='all', secondary_cat
         x=avg_comments,
         name='平均评论',
         orientation='h',
-        marker_color='#4ECDC4',
+        marker_color=ColorTheme.COMMENTS,
         hovertemplate='<b>%{y}</b><br>平均评论： %{x:,}<extra></extra>'
     ))
 
@@ -280,50 +252,20 @@ def create_category_bar_chart_figure(data, primary_category='all', secondary_cat
         x=avg_shares,
         name='平均分享',
         orientation='h',
-        marker_color='#FFE66D',
+        marker_color=ColorTheme.SHARES,
         hovertemplate='<b>%{y}</b><br>平均分享： %{x:,}<extra></extra>'
     ))
 
-    fig.update_layout(
-        title={
-            'text': '视频分类平均互动数据对比',
-            'font': {'size': 20, 'family': 'Microsoft YaHei', 'color': '#2C3E50'},
-            'y': 0.95,
-            'x': 0.5
-        },
-        xaxis_title={
-            'text': '平均互动数量',
-            'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
-        },
-        yaxis_title={
-            'text': '视频分类',
-            'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
-        },
+    apply_common_layout(
+        fig,
+        title_text='视频分类平均互动数据对比',
+        xaxis_title='平均互动数量',
+        yaxis_title='视频分类',
         barmode='group',
         hovermode='y unified',
-        showlegend=True,
-        legend={
-            'orientation': 'h',
-            'y': 1.02,
-            'x': 0.5,
-            'xanchor': 'center',
-            'font': {'size': 12, 'family': 'Microsoft YaHei'}
-        },
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font={'family': 'Microsoft YaHei'},
-        margin={'t': 80, 'l': 80, 'r': 40, 'b': 60},
-        height=450
-    )
-
-    fig.update_xaxes(
-        tickfont={'family': 'Microsoft YaHei', 'size': 12, 'color': '#34495E'},
-        gridcolor='rgba(0,0,0,0.1)'
-    )
-
-    fig.update_yaxes(
-        tickfont={'family': 'Microsoft YaHei', 'size': 12, 'color': '#34495E'},
-        gridcolor='rgba(0,0,0,0.1)'
+        legend_y=1.02,
+        height=450,
+        margin=LayoutConfig.get_margin(t=80, l=80)
     )
 
     return fig

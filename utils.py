@@ -1,3 +1,115 @@
+class ColorTheme:
+    LIKES = '#FF6B6B'
+    COMMENTS = '#4ECDC4'
+    SHARES = '#FFE66D'
+    TOTAL_INTERACTIONS = '#9B59B6'
+
+    PIE_COLORS = [
+        '#FF6B6B', '#4ECDC4', '#FFE66D', '#9B59B6',
+        '#3498DB', '#E67E22', '#1ABC9C', '#E74C3C'
+    ]
+
+    TITLE_TEXT = '#2C3E50'
+    AXIS_TITLE_TEXT = '#7F8C8D'
+    TICK_TEXT = '#34495E'
+    GRID_COLOR = 'rgba(0,0,0,0.1)'
+    TRANSPARENT = 'rgba(0,0,0,0)'
+
+    UP = '#27AE60'
+    DOWN = '#E74C3C'
+    NEUTRAL = '#7F8C8D'
+
+    @classmethod
+    def get_bar_colors(cls):
+        return [cls.LIKES, cls.COMMENTS, cls.SHARES]
+
+    @classmethod
+    def get_pie_colors(cls, count=None):
+        if count is None:
+            return cls.PIE_COLORS
+        return cls.PIE_COLORS[:count]
+
+
+class FontConfig:
+    FAMILY = 'Microsoft YaHei'
+    TITLE_SIZE = 20
+    TITLE_SIZE_LARGE = 24
+    AXIS_TITLE_SIZE = 14
+    LEGEND_SIZE = 12
+    LEGEND_SIZE_LARGE = 13
+    TICK_SIZE = 12
+    TEXT_SIZE = 12
+
+    @classmethod
+    def get_font(cls, size=None):
+        font_config = {'family': cls.FAMILY}
+        if size is not None:
+            font_config['size'] = size
+        return font_config
+
+    @classmethod
+    def get_title_font(cls, large=False):
+        size = cls.TITLE_SIZE_LARGE if large else cls.TITLE_SIZE
+        return {'size': size, 'family': cls.FAMILY, 'color': ColorTheme.TITLE_TEXT}
+
+    @classmethod
+    def get_axis_title_font(cls):
+        return {'size': cls.AXIS_TITLE_SIZE, 'family': cls.FAMILY, 'color': ColorTheme.AXIS_TITLE_TEXT}
+
+    @classmethod
+    def get_legend_font(cls, large=False):
+        size = cls.LEGEND_SIZE_LARGE if large else cls.LEGEND_SIZE
+        return {'size': size, 'family': cls.FAMILY}
+
+    @classmethod
+    def get_tick_font(cls):
+        return {'family': cls.FAMILY, 'size': cls.TICK_SIZE, 'color': ColorTheme.TICK_TEXT}
+
+
+class LayoutConfig:
+    PLOT_BGCOLOR = ColorTheme.TRANSPARENT
+    PAPER_BGCOLOR = ColorTheme.TRANSPARENT
+
+    LEGEND_ORIENTATION = 'h'
+    LEGEND_X = 0.5
+    LEGEND_XANCHOR = 'center'
+
+    TITLE_Y = 0.95
+    TITLE_X = 0.5
+
+    @classmethod
+    def get_legend_config(cls, y=None, large=False):
+        config = {
+            'orientation': cls.LEGEND_ORIENTATION,
+            'x': cls.LEGEND_X,
+            'xanchor': cls.LEGEND_XANCHOR,
+            'font': FontConfig.get_legend_font(large=large)
+        }
+        if y is not None:
+            config['y'] = y
+        return config
+
+    @classmethod
+    def get_title_config(cls, text, large=False):
+        return {
+            'text': text,
+            'font': FontConfig.get_title_font(large=large),
+            'y': cls.TITLE_Y,
+            'x': cls.TITLE_X
+        }
+
+    @classmethod
+    def get_axis_title_config(cls, text):
+        return {
+            'text': text,
+            'font': FontConfig.get_axis_title_font()
+        }
+
+    @classmethod
+    def get_margin(cls, t=60, l=60, r=40, b=60):
+        return {'t': t, 'l': l, 'r': r, 'b': b}
+
+
 def calculate_rankings(data, top_n=3):
     videos = data['videos']
     likes = data['likes']
