@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import numpy as np
 from mock_data import get_data_by_period, TIME_PERIOD_DATA, CATEGORIES, VIDEO_CATEGORIES, VIDEO_SECONDARY_CATEGORIES
 from utils import calculate_rankings, format_ranking_items, get_aggregated_trend_data, format_number, calculate_growth_rates, calculate_growth_rankings
-from export_utils import export_data_to_csv
+from export_utils import export_data_to_csv, export_data_to_excel
 from category_utils import filter_data_by_category, get_category_summary_rows, get_category_bar_traces, filter_all_periods_by_category, get_secondary_categories
 from data_timer import data_timer
 
@@ -795,6 +795,21 @@ app.layout = html.Div([
                         'cursor': 'pointer',
                         'boxShadow': '0 2px 6px rgba(39, 174, 96, 0.3)',
                         'transition': 'all 0.3s ease',
+                        'marginRight': '10px'
+                    }
+                ),
+                dcc.Dropdown(
+                    id='export-format-dropdown',
+                    options=[
+                        {'label': 'CSV 格式', 'value': 'csv'},
+                        {'label': 'Excel 格式', 'value': 'excel'}
+                    ],
+                    value='csv',
+                    clearable=False,
+                    style={
+                        'width': '120px',
+                        'fontFamily': 'Microsoft YaHei',
+                        'fontSize': '13px',
                         'marginRight': '10px'
                     }
                 ),
@@ -1711,9 +1726,10 @@ def update_dashboard(selected_period, primary_category, secondary_category, refr
      State('primary-category-dropdown', 'value'),
      State('secondary-category-dropdown', 'value'),
      State('start-date-picker', 'date'),
-     State('end-date-picker', 'date')]
+     State('end-date-picker', 'date'),
+     State('export-format-dropdown', 'value')]
 )
-def export_csv(n_clicks, selected_period, primary_category, secondary_category, start_date, end_date):
+def export_data(n_clicks, selected_period, primary_category, secondary_category, start_date, end_date, export_format):
     if n_clicks is None or n_clicks == 0:
         return no_update
 
@@ -1735,7 +1751,18 @@ def export_csv(n_clicks, selected_period, primary_category, secondary_category, 
     if secondary_category != 'all':
         category_label += f'_{secondary_category}'
 
-    return export_data_to_csv(data, f'{period_label}{category_label}')
+    full_label = f'{period_label}{category_label}'
+
+    if export_format == 'excel':
+        category_summary = get_category_summary_rows(data, primary_category, secondary_category)
+        if selected_period == 'custom' and start_date and end_date:
+            trend_data = data_timer.get_custom_trend_data(start_date, end_date)
+        else:
+            filtered_all_periods = filter_all_periods_by_category(data_timer.get_all_periods_data(), primary_category, secondary_category)
+            trend_data = get_aggregated_trend_data(filtered_all_periods)
+        return export_data_to_excel(data, full_label, category_summary, trend_data)
+    else:
+        return export_data_to_csv(data, full_label)
 
 
 @app.callback(
