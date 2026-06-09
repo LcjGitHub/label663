@@ -60,15 +60,25 @@ def calculate_growth_rates(changes_data, current_data):
         comments_prev = comments[i] - comments_change
         shares_prev = shares[i] - shares_change
 
-        likes_rate = (likes_change / likes_prev * 100) if likes_prev > 0 else 0
-        comments_rate = (comments_change / comments_prev * 100) if comments_prev > 0 else 0
-        shares_rate = (shares_change / shares_prev * 100) if shares_prev > 0 else 0
+        def compute_rate(change, prev):
+            if prev > 0:
+                return round(change / prev * 100, 2)
+            elif change > 0:
+                return float('inf')
+            elif change < 0:
+                return float('-inf')
+            else:
+                return 0.0
+
+        likes_rate = compute_rate(likes_change, likes_prev)
+        comments_rate = compute_rate(comments_change, comments_prev)
+        shares_rate = compute_rate(shares_change, shares_prev)
 
         growth_data.append({
             'name': video_name,
-            'likes': round(likes_rate, 2),
-            'comments': round(comments_rate, 2),
-            'shares': round(shares_rate, 2)
+            'likes': likes_rate,
+            'comments': comments_rate,
+            'shares': shares_rate
         })
 
     return growth_data
@@ -87,7 +97,11 @@ def calculate_growth_rankings(growth_data, top_n=3):
 
 
 def format_growth_rate(rate):
-    if rate > 0:
+    if rate == float('inf'):
+        return '+∞%'
+    elif rate == float('-inf'):
+        return '-∞%'
+    elif rate > 0:
         return f'+{rate:.2f}%'
     elif rate < 0:
         return f'{rate:.2f}%'

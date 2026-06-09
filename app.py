@@ -509,11 +509,9 @@ def create_ranking_panel(data, ranking_mode='absolute', changes_data=None):
         growth_data = calculate_growth_rates(changes_data, data)
         rankings = calculate_growth_rankings(growth_data, top_n=3)
         is_growth = True
-        title_suffix = '（增长率）'
     else:
         rankings = calculate_rankings(data, top_n=3)
         is_growth = False
-        title_suffix = '（绝对数值）'
 
     likes_items = format_ranking_items(rankings['likes'], 'likes', is_growth=is_growth)
     comments_items = format_ranking_items(rankings['comments'], 'comments', is_growth=is_growth)
@@ -567,84 +565,7 @@ def create_ranking_panel(data, ranking_mode='absolute', changes_data=None):
             'marginBottom': '25px'
         })
 
-    abs_btn_style = {
-        'flex': '1',
-        'padding': '8px 12px',
-        'border': 'none',
-        'borderRadius': '6px',
-        'fontFamily': 'Microsoft YaHei',
-        'fontSize': '13px',
-        'fontWeight': 'bold',
-        'cursor': 'pointer',
-        'transition': 'all 0.3s ease'
-    }
-    growth_btn_style = abs_btn_style.copy()
-
-    if ranking_mode == 'absolute':
-        abs_btn_style.update({
-            'backgroundColor': '#3498DB',
-            'color': '#FFFFFF',
-            'boxShadow': '0 2px 6px rgba(52, 152, 219, 0.4)'
-        })
-        growth_btn_style.update({
-            'backgroundColor': '#F0F0F0',
-            'color': '#7F8C8D'
-        })
-    else:
-        growth_btn_style.update({
-            'backgroundColor': '#3498DB',
-            'color': '#FFFFFF',
-            'boxShadow': '0 2px 6px rgba(52, 152, 219, 0.4)'
-        })
-        abs_btn_style.update({
-            'backgroundColor': '#F0F0F0',
-            'color': '#7F8C8D'
-        })
-
     return html.Div([
-        html.Div([
-            html.Div(
-                '🏆 互动排行榜',
-                style={
-                    'fontFamily': 'Microsoft YaHei',
-                    'fontSize': '18px',
-                    'fontWeight': 'bold',
-                    'color': '#2C3E50',
-                    'textAlign': 'center',
-                    'marginBottom': '12px'
-                }
-            ),
-            html.Div(
-                title_suffix,
-                style={
-                    'fontFamily': 'Microsoft YaHei',
-                    'fontSize': '12px',
-                    'color': '#7F8C8D',
-                    'textAlign': 'center',
-                    'marginBottom': '15px'
-                }
-            ),
-            html.Div([
-                html.Button(
-                    '📊 绝对数值',
-                    id='ranking-mode-absolute',
-                    n_clicks=0,
-                    style=abs_btn_style
-                ),
-                html.Button(
-                    '📈 增长率',
-                    id='ranking-mode-growth',
-                    n_clicks=0,
-                    style=growth_btn_style
-                )
-            ], style={
-                'display': 'flex',
-                'gap': '8px',
-                'marginBottom': '20px',
-                'paddingBottom': '15px',
-                'borderBottom': '2px solid #E8E8E8'
-            })
-        ]),
         create_ranking_section('点赞排行榜', likes_items, '#FF6B6B', '👍'),
         create_ranking_section('评论排行榜', comments_items, '#4ECDC4', '💬'),
         create_ranking_section('分享排行榜', shares_items, '#FFE66D', '📤')
@@ -1330,8 +1251,6 @@ app.layout = html.Div([
 
             html.Div(
                 className='right-sidebar',
-                id='ranking-sidebar',
-                children=initial_ranking_panel,
                 style={
                     'flex': '1 1 300px',
                     'backgroundColor': '#FFFFFF',
@@ -1341,7 +1260,82 @@ app.layout = html.Div([
                     'height': 'fit-content',
                     'position': 'sticky',
                     'top': '20px'
-                }
+                },
+                children=[
+                    html.Div([
+                        html.Div(
+                            '🏆 互动排行榜',
+                            style={
+                                'fontFamily': 'Microsoft YaHei',
+                                'fontSize': '18px',
+                                'fontWeight': 'bold',
+                                'color': '#2C3E50',
+                                'textAlign': 'center',
+                                'marginBottom': '12px'
+                            }
+                        ),
+                        html.Div(
+                            id='ranking-mode-label',
+                            children='（绝对数值）',
+                            style={
+                                'fontFamily': 'Microsoft YaHei',
+                                'fontSize': '12px',
+                                'color': '#7F8C8D',
+                                'textAlign': 'center',
+                                'marginBottom': '15px'
+                            }
+                        ),
+                        html.Div([
+                            html.Button(
+                                '📊 绝对数值',
+                                id='ranking-mode-absolute',
+                                n_clicks=0,
+                                style={
+                                    'flex': '1',
+                                    'padding': '8px 12px',
+                                    'border': 'none',
+                                    'borderRadius': '6px',
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '13px',
+                                    'fontWeight': 'bold',
+                                    'cursor': 'pointer',
+                                    'transition': 'all 0.3s ease',
+                                    'backgroundColor': '#3498DB',
+                                    'color': '#FFFFFF',
+                                    'boxShadow': '0 2px 6px rgba(52, 152, 219, 0.4)'
+                                }
+                            ),
+                            html.Button(
+                                '📈 增长率',
+                                id='ranking-mode-growth',
+                                n_clicks=0,
+                                style={
+                                    'flex': '1',
+                                    'padding': '8px 12px',
+                                    'border': 'none',
+                                    'borderRadius': '6px',
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '13px',
+                                    'fontWeight': 'bold',
+                                    'cursor': 'pointer',
+                                    'transition': 'all 0.3s ease',
+                                    'backgroundColor': '#F0F0F0',
+                                    'color': '#7F8C8D'
+                                }
+                            )
+                        ], style={
+                            'display': 'flex',
+                            'gap': '8px',
+                            'marginBottom': '20px',
+                            'paddingBottom': '15px',
+                            'borderBottom': '2px solid #E8E8E8'
+                        })
+                    ]),
+                    html.Div(
+                        id='ranking-sidebar',
+                        children=initial_ranking_panel
+                    )
+                ]
             )
         ],
         style={
@@ -1461,6 +1455,43 @@ app.layout = html.Div([
 })
 
 
+def _get_ranking_button_styles(ranking_mode):
+    abs_btn_style = {
+        'flex': '1',
+        'padding': '8px 12px',
+        'border': 'none',
+        'borderRadius': '6px',
+        'fontFamily': 'Microsoft YaHei',
+        'fontSize': '13px',
+        'fontWeight': 'bold',
+        'cursor': 'pointer',
+        'transition': 'all 0.3s ease'
+    }
+    growth_btn_style = abs_btn_style.copy()
+    if ranking_mode == 'absolute':
+        abs_btn_style.update({
+            'backgroundColor': '#3498DB',
+            'color': '#FFFFFF',
+            'boxShadow': '0 2px 6px rgba(52, 152, 219, 0.4)'
+        })
+        growth_btn_style.update({
+            'backgroundColor': '#F0F0F0',
+            'color': '#7F8C8D'
+        })
+    else:
+        growth_btn_style.update({
+            'backgroundColor': '#3498DB',
+            'color': '#FFFFFF',
+            'boxShadow': '0 2px 6px rgba(52, 152, 219, 0.4)'
+        })
+        abs_btn_style.update({
+            'backgroundColor': '#F0F0F0',
+            'color': '#7F8C8D'
+        })
+    mode_label = '（绝对数值）' if ranking_mode == 'absolute' else '（增长率）'
+    return abs_btn_style, growth_btn_style, mode_label
+
+
 @app.callback(
     [Output('total-likes', 'children'),
      Output('total-comments', 'children'),
@@ -1481,7 +1512,10 @@ app.layout = html.Div([
      Output('total-comments-change', 'children'),
      Output('total-shares-change', 'children'),
      Output('total-interactions-change', 'children'),
-     Output('footer-text', 'children')],
+     Output('footer-text', 'children'),
+     Output('ranking-mode-absolute', 'style'),
+     Output('ranking-mode-growth', 'style'),
+     Output('ranking-mode-label', 'children')],
     [Input('time-period-dropdown', 'value'),
      Input('category-radio', 'value'),
      Input('refresh-button', 'n_clicks'),
@@ -1561,11 +1595,13 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
         period_labels = {'today': '今日', 'week': '本周', 'month': '本月', 'custom': '自定义'}
         period_label = period_labels.get(selected_period, selected_period)
         footer_text = f'数据来源：模拟数据 | 当前查询：{period_label} | 更新时间：{last_update_time}'
+        abs_style, growth_style, mode_label = _get_ranking_button_styles(ranking_mode)
         return (hint, hint, hint, hint, empty_fig, empty_pie, empty_trend, [],
                 html.Div(hint, style={'color': '#E74C3C', 'fontFamily': 'Microsoft YaHei', 'textAlign': 'center', 'padding': '20px'}),
                 html.Div(hint, style={'color': '#E74C3C', 'fontFamily': 'Microsoft YaHei', 'textAlign': 'center', 'padding': '20px'}),
                 None, empty_category, [], last_update_time, html.Div([]),
-                html.Div([]), html.Div([]), html.Div([]), html.Div([]), footer_text)
+                html.Div([]), html.Div([]), html.Div([]), html.Div([]), footer_text,
+                abs_style, growth_style, mode_label)
 
     if selected_period == 'custom' and start_date and end_date:
         raw_data = data_timer.get_data_by_custom_range(start_date, end_date)
@@ -1592,7 +1628,8 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
 
     custom_start = start_date if selected_period == 'custom' else None
     custom_end = end_date if selected_period == 'custom' else None
-    raw_changes = data_timer.calculate_changes(selected_period, custom_start, custom_end)
+    growth_info = data_timer.get_growth_data(selected_period, custom_start, custom_end)
+    raw_changes = growth_info['changes']
     if selected_category != 'all':
         from mock_data import VIDEO_CATEGORIES
         changes_data = [c for c in raw_changes if VIDEO_CATEGORIES.get(c['video']) == selected_category]
@@ -1629,7 +1666,8 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
     else:
         footer_text = f'数据来源：模拟数据 | 当前查询：{period_label} | 更新时间：{last_update_time}'
 
-    return total_likes, total_comments, total_shares, total_interactions, figure, pie_figure, trend_figure, table_data, ranking_panel, video_detail, video_store_value, category_bar_fig, category_summary, last_update_time, change_indicators, likes_change_ind, comments_change_ind, shares_change_ind, interactions_change_ind, footer_text
+    abs_style, growth_style, mode_label = _get_ranking_button_styles(ranking_mode)
+    return total_likes, total_comments, total_shares, total_interactions, figure, pie_figure, trend_figure, table_data, ranking_panel, video_detail, video_store_value, category_bar_fig, category_summary, last_update_time, change_indicators, likes_change_ind, comments_change_ind, shares_change_ind, interactions_change_ind, footer_text, abs_style, growth_style, mode_label
 
 
 @app.callback(
