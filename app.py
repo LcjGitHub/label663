@@ -573,8 +573,8 @@ def create_ranking_panel(data):
     ])
 
 
-def create_change_indicators(period, selected_category='all'):
-    changes = data_timer.calculate_changes(period)
+def create_change_indicators(period, selected_category='all', start_date=None, end_date=None):
+    changes = data_timer.calculate_changes(period, start_date, end_date)
 
     if selected_category != 'all':
         from mock_data import VIDEO_CATEGORIES
@@ -856,7 +856,8 @@ app.layout = html.Div([
                         options=[
                             {'label': '今日', 'value': 'today'},
                             {'label': '本周', 'value': 'week'},
-                            {'label': '本月', 'value': 'month'}
+                            {'label': '本月', 'value': 'month'},
+                            {'label': '自定义', 'value': 'custom'}
                         ],
                         value='today',
                         clearable=False,
@@ -865,12 +866,62 @@ app.layout = html.Div([
                             'fontFamily': 'Microsoft YaHei',
                             'fontSize': '14px'
                         }
+                    ),
+                    html.Div(
+                        id='custom-date-range-container',
+                        children=[
+                            html.Label(
+                                '开始日期：',
+                                style={
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '14px',
+                                    'color': '#2C3E50',
+                                    'marginLeft': '20px',
+                                    'marginRight': '8px',
+                                    'fontWeight': 'bold'
+                                }
+                            ),
+                            dcc.DatePickerSingle(
+                                id='start-date-picker',
+                                display_format='YYYY-MM-DD',
+                                placeholder='选择开始日期',
+                                style={
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '14px'
+                                }
+                            ),
+                            html.Label(
+                                '结束日期：',
+                                style={
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '14px',
+                                    'color': '#2C3E50',
+                                    'marginLeft': '15px',
+                                    'marginRight': '8px',
+                                    'fontWeight': 'bold'
+                                }
+                            ),
+                            dcc.DatePickerSingle(
+                                id='end-date-picker',
+                                display_format='YYYY-MM-DD',
+                                placeholder='选择结束日期',
+                                style={
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '14px'
+                                }
+                            )
+                        ],
+                        style={
+                            'display': 'none',
+                            'alignItems': 'center'
+                        }
                     )
                 ],
                 style={
                     'display': 'flex',
                     'alignItems': 'center',
-                    'justifyContent': 'flex-end'
+                    'justifyContent': 'flex-end',
+                    'flexWrap': 'wrap'
                 }
             )
         ],
@@ -1355,11 +1406,13 @@ app.layout = html.Div([
     [Input('time-period-dropdown', 'value'),
      Input('category-radio', 'value'),
      Input('refresh-button', 'n_clicks'),
-     Input('auto-refresh-interval', 'n_intervals')],
+     Input('auto-refresh-interval', 'n_intervals'),
+     Input('start-date-picker', 'date'),
+     Input('end-date-picker', 'date')],
     [State('refresh-trigger', 'data'),
      State('selected-video-store', 'data')]
 )
-def update_dashboard(selected_period, selected_category, refresh_clicks, auto_intervals, refresh_trigger, selected_video):
+def update_dashboard(selected_period, selected_category, refresh_clicks, auto_intervals, start_date, end_date, refresh_trigger, selected_video):
     ctx = dash.callback_context
     triggered = ctx.triggered[0]['prop_id'].split('.')[0]
 
@@ -1372,7 +1425,10 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
     if should_refresh:
         data_timer.refresh_data()
 
-    raw_data = data_timer.get_data_by_period(selected_period)
+    if selected_period == 'custom' and start_date and end_date:
+        raw_data = data_timer.get_data_by_custom_range(start_date, end_date)
+    else:
+        raw_data = data_timer.get_data_by_period(selected_period)
     data = filter_data_by_category(raw_data, selected_category)
 
     total_likes = f'{sum(data["likes"]):,}'
@@ -1400,9 +1456,12 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
     category_summary = get_category_summary_rows(data)
 
     last_update_time = data_timer.get_last_update_time()
-    change_indicators = create_change_indicators(selected_period, selected_category)
 
-    total_changes = data_timer.calculate_total_changes(selected_period)
+    custom_start = start_date if selected_period == 'custom' else None
+    custom_end = end_date if selected_period == 'custom' else None
+    change_indicators = create_change_indicators(selected_period, selected_category, custom_start, custom_end)
+
+    total_changes = data_timer.calculate_total_changes(selected_period, custom_start, custom_end)
     likes_change_ind = create_stat_change_indicator(total_changes['likes_change'])
     comments_change_ind = create_stat_change_indicator(total_changes['comments_change'])
     shares_change_ind = create_stat_change_indicator(total_changes['shares_change'])
@@ -1417,23 +1476,46 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
     Output('download-csv', 'data'),
     [Input('export-button', 'n_clicks')],
     [State('time-period-dropdown', 'value'),
-     State('category-radio', 'value')]
+     State('category-radio', 'value'),
+     State('start-date-picker', 'date'),
+     State('end-date-picker', 'date')]
 )
-def export_csv(n_clicks, selected_period, selected_category):
+def export_csv(n_clicks, selected_period, selected_category, start_date, end_date):
     if n_clicks is None or n_clicks == 0:
         return no_update
 
-    raw_data = data_timer.get_data_by_period(selected_period)
+    if selected_period == 'custom' and start_date and end_date:
+        raw_data = data_timer.get_data_by_custom_range(start_date, end_date)
+        period_label = f'{start_date}_至_{end_date}'
+    else:
+        raw_data = data_timer.get_data_by_period(selected_period)
+        period_labels = {
+            'today': '今日',
+            'week': '本周',
+            'month': '本月'
+        }
+        period_label = period_labels.get(selected_period, '数据')
     data = filter_data_by_category(raw_data, selected_category)
-    period_labels = {
-        'today': '今日',
-        'week': '本周',
-        'month': '本月'
-    }
-    period_label = period_labels.get(selected_period, '数据')
     category_label = f'_{selected_category}' if selected_category != 'all' else ''
 
     return export_data_to_csv(data, f'{period_label}{category_label}')
+
+
+@app.callback(
+    Output('custom-date-range-container', 'style'),
+    [Input('time-period-dropdown', 'value')]
+)
+def toggle_custom_date_range(selected_period):
+    if selected_period == 'custom':
+        return {
+            'display': 'flex',
+            'alignItems': 'center'
+        }
+    else:
+        return {
+            'display': 'none',
+            'alignItems': 'center'
+        }
 
 
 @app.callback(
@@ -1455,11 +1537,16 @@ def handle_pie_click(click_data, current_scroll_trigger):
     Output('video-detail-card', 'children', allow_duplicate=True),
     [Input('selected-video-store', 'data')],
     [State('time-period-dropdown', 'value'),
-     State('category-radio', 'value')],
+     State('category-radio', 'value'),
+     State('start-date-picker', 'date'),
+     State('end-date-picker', 'date')],
     prevent_initial_call=True
 )
-def update_video_detail_from_store(selected_video, selected_period, selected_category):
-    raw_data = data_timer.get_data_by_period(selected_period)
+def update_video_detail_from_store(selected_video, selected_period, selected_category, start_date, end_date):
+    if selected_period == 'custom' and start_date and end_date:
+        raw_data = data_timer.get_data_by_custom_range(start_date, end_date)
+    else:
+        raw_data = data_timer.get_data_by_period(selected_period)
     data = filter_data_by_category(raw_data, selected_category)
     return create_video_detail_card(selected_video, data)
 

@@ -1,7 +1,7 @@
 import random
 import copy
 from datetime import datetime
-from mock_data import TIME_PERIOD_DATA
+from mock_data import TIME_PERIOD_DATA, get_data_by_date_range
 
 
 class DataTimer:
@@ -11,6 +11,8 @@ class DataTimer:
         self.last_update_time = datetime.now()
         self.auto_refresh_enabled = False
         self.refresh_interval = 30
+        self.custom_range_cache = {}
+        self.custom_range_previous_cache = {}
 
     def _simulate_data_change(self, data):
         for period in data:
@@ -24,20 +26,54 @@ class DataTimer:
                 period_data['shares'][i] = max(0, period_data['shares'][i] + change_shares)
         return data
 
+    def _simulate_custom_range_change(self, data):
+        result = copy.deepcopy(data)
+        for i in range(len(result['likes'])):
+            change_likes = random.randint(-10, 20)
+            change_comments = random.randint(-5, 10)
+            change_shares = random.randint(-3, 8)
+            result['likes'][i] = max(0, result['likes'][i] + change_likes)
+            result['comments'][i] = max(0, result['comments'][i] + change_comments)
+            result['shares'][i] = max(0, result['shares'][i] + change_shares)
+        return result
+
+    def _get_range_key(self, start_date, end_date):
+        return f'{start_date}__{end_date}'
+
     def refresh_data(self):
         self.previous_data = copy.deepcopy(self.current_data)
         self.current_data = self._simulate_data_change(copy.deepcopy(self.current_data))
+        self.custom_range_previous_cache = copy.deepcopy(self.custom_range_cache)
+        for key in self.custom_range_cache:
+            self.custom_range_cache[key] = self._simulate_custom_range_change(self.custom_range_cache[key])
         self.last_update_time = datetime.now()
 
     def get_data_by_period(self, period):
         return self.current_data.get(period, self.current_data['today'])
 
+    def get_data_by_custom_range(self, start_date, end_date):
+        if not start_date or not end_date:
+            return self.current_data['today']
+        key = self._get_range_key(start_date, end_date)
+        if key not in self.custom_range_cache:
+            base_data = get_data_by_date_range(start_date, end_date)
+            self.custom_range_cache[key] = self._simulate_custom_range_change(base_data)
+            self.custom_range_previous_cache[key] = copy.deepcopy(base_data)
+        return self.custom_range_cache[key]
+
     def get_all_periods_data(self):
         return self.current_data
 
-    def calculate_changes(self, period):
-        current = self.current_data.get(period, self.current_data['today'])
-        previous = self.previous_data.get(period, self.previous_data['today'])
+    def calculate_changes(self, period, start_date=None, end_date=None):
+        if period == 'custom' and start_date and end_date:
+            key = self._get_range_key(start_date, end_date)
+            current = self.custom_range_cache.get(key)
+            previous = self.custom_range_previous_cache.get(key)
+            if current is None or previous is None:
+                return []
+        else:
+            current = self.current_data.get(period, self.current_data['today'])
+            previous = self.previous_data.get(period, self.previous_data['today'])
 
         changes = []
         for i in range(len(current['videos'])):
@@ -56,9 +92,16 @@ class DataTimer:
 
         return changes
 
-    def calculate_total_changes(self, period):
-        current = self.current_data.get(period, self.current_data['today'])
-        previous = self.previous_data.get(period, self.previous_data['today'])
+    def calculate_total_changes(self, period, start_date=None, end_date=None):
+        if period == 'custom' and start_date and end_date:
+            key = self._get_range_key(start_date, end_date)
+            current = self.custom_range_cache.get(key)
+            previous = self.custom_range_previous_cache.get(key)
+            if current is None or previous is None:
+                return {'likes_change': 0, 'comments_change': 0, 'shares_change': 0, 'total_change': 0}
+        else:
+            current = self.current_data.get(period, self.current_data['today'])
+            previous = self.previous_data.get(period, self.previous_data['today'])
 
         return {
             'likes_change': sum(current['likes']) - sum(previous['likes']),

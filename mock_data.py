@@ -1,3 +1,6 @@
+import random
+from datetime import datetime, timedelta
+
 VIDEO_NAMES = ['视频 1', '视频 2', '视频 3', '视频 4', '视频 5', '视频 6', '视频 7', '视频 8']
 
 VIDEO_CATEGORIES = {
@@ -39,6 +42,68 @@ TIME_PERIOD_DATA = {
         'shares': [620, 1020, 420, 1350, 880, 330, 740, 1180]
     }
 }
+
+
+def _generate_daily_data(base_date_str):
+    random.seed(hash(base_date_str))
+    return {
+        'likes': [random.randint(50, 300) for _ in VIDEO_NAMES],
+        'comments': [random.randint(10, 100) for _ in VIDEO_NAMES],
+        'shares': [random.randint(5, 60) for _ in VIDEO_NAMES]
+    }
+
+
+def _ensure_date_str(date_obj):
+    if isinstance(date_obj, datetime):
+        return date_obj.strftime('%Y-%m-%d')
+    elif isinstance(date_obj, str):
+        try:
+            datetime.strptime(date_obj, '%Y-%m-%d')
+            return date_obj
+        except ValueError:
+            return datetime.now().strftime('%Y-%m-%d')
+    return datetime.now().strftime('%Y-%m-%d')
+
+
+def get_data_by_date_range(start_date, end_date):
+    start_str = _ensure_date_str(start_date)
+    end_str = _ensure_date_str(end_date)
+
+    try:
+        start_dt = datetime.strptime(start_str, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_str, '%Y-%m-%d')
+    except ValueError:
+        return TIME_PERIOD_DATA['today']
+
+    if start_dt > end_dt:
+        start_dt, end_dt = end_dt, start_dt
+
+    total_likes = [0] * len(VIDEO_NAMES)
+    total_comments = [0] * len(VIDEO_NAMES)
+    total_shares = [0] * len(VIDEO_NAMES)
+
+    current_dt = start_dt
+    day_count = 0
+    while current_dt <= end_dt:
+        daily = _generate_daily_data(current_dt.strftime('%Y-%m-%d'))
+        for i in range(len(VIDEO_NAMES)):
+            total_likes[i] += daily['likes'][i]
+            total_comments[i] += daily['comments'][i]
+            total_shares[i] += daily['shares'][i]
+        day_count += 1
+        current_dt += timedelta(days=1)
+
+    return {
+        'label': f'{start_str} 至 {end_str}',
+        'videos': VIDEO_NAMES,
+        'categories': [VIDEO_CATEGORIES[v] for v in VIDEO_NAMES],
+        'likes': total_likes,
+        'comments': total_comments,
+        'shares': total_shares,
+        'day_count': day_count,
+        'start_date': start_str,
+        'end_date': end_str
+    }
 
 
 def get_data_by_period(period):
