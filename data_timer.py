@@ -183,7 +183,7 @@ class DataTimer:
     def get_trend(self, metric):
         history = self.change_history.get(metric, [])
         if len(history) < 2:
-            return 'stable'
+            return None
         recent = history[-3:] if len(history) >= 3 else history
         positive_count = sum(1 for v in recent if v > 0)
         negative_count = sum(1 for v in recent if v < 0)
@@ -195,28 +195,12 @@ class DataTimer:
             return 'fluctuating'
 
     def get_total_trends(self, period, start_date=None, end_date=None):
-        if period == 'today':
-            return {
-                'likes': self.get_trend('likes'),
-                'comments': self.get_trend('comments'),
-                'shares': self.get_trend('shares'),
-                'total': self.get_trend('total')
-            }
-        else:
-            total_changes = self.calculate_total_changes(period, start_date, end_date)
-            def single_trend(value):
-                if value > 0:
-                    return 'up'
-                elif value < 0:
-                    return 'down'
-                else:
-                    return 'stable'
-            return {
-                'likes': single_trend(total_changes['likes_change']),
-                'comments': single_trend(total_changes['comments_change']),
-                'shares': single_trend(total_changes['shares_change']),
-                'total': single_trend(total_changes['total_change'])
-            }
+        return {
+            'likes': self.get_trend('likes'),
+            'comments': self.get_trend('comments'),
+            'shares': self.get_trend('shares'),
+            'total': self.get_trend('total')
+        }
 
 
 data_timer = DataTimer()

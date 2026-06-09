@@ -679,14 +679,14 @@ def create_stat_change_indicator(value, trend=None):
         icon = '→'
         color = '#7F8C8D'
 
-    trend_info = format_trend(trend) if trend else None
+    trend_info = format_trend(trend)
 
     children = [
         html.Span(icon, style={
             'fontSize': '16px',
             'fontWeight': 'bold',
             'color': color,
-            'marginRight': '4px'
+            'marginRight': '3px'
         }),
         html.Span(data_timer.format_change(value), style={
             'fontSize': '13px',
@@ -696,13 +696,12 @@ def create_stat_change_indicator(value, trend=None):
         })
     ]
 
-    if trend_info:
-        children.insert(0, html.Span(trend_info['icon'], style={
+    if trend_info is not None:
+        children.append(html.Span(trend_info['icon'], title=trend_info['label'], style={
             'fontSize': '12px',
             'fontWeight': 'bold',
             'color': trend_info['color'],
-            'marginRight': '6px',
-            'title': trend_info['label']
+            'marginLeft': '4px'
         }))
 
     return html.Div(children, style={

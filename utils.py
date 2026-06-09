@@ -172,6 +172,8 @@ def format_number(num):
 
 
 def format_trend(trend):
+    if trend is None:
+        return None
     if trend == 'up':
         return {
             'icon': '↑↑',
@@ -186,7 +188,7 @@ def format_trend(trend):
         }
     elif trend == 'fluctuating':
         return {
-            'icon': '↗↘',
+            'icon': '〰️',
             'color': '#F39C12',
             'label': '波动'
         }
