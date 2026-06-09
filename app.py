@@ -1,9 +1,10 @@
 import dash
-from dash import html, dcc, dash_table, Input, Output, State
+from dash import html, dcc, dash_table, Input, Output, State, no_update
 import plotly.graph_objects as go
 import numpy as np
 from mock_data import get_data_by_period, TIME_PERIOD_DATA
 from utils import calculate_rankings, format_ranking_items, get_aggregated_trend_data, format_number
+from export_utils import export_data_to_csv
 
 app = dash.Dash(__name__)
 app.title = "内容互动分析"
@@ -188,6 +189,232 @@ def create_trend_chart_figure():
     return fig
 
 
+def create_pie_chart_figure(data):
+    videos = data['videos']
+    likes = data['likes']
+    comments = data['comments']
+    shares = data['shares']
+
+    total_interactions = []
+    for i in range(len(videos)):
+        total = likes[i] + comments[i] + shares[i]
+        total_interactions.append(total)
+
+    colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#9B59B6', '#3498DB', '#E67E22', '#1ABC9C', '#E74C3C']
+
+    fig = go.Figure(data=[go.Pie(
+        labels=videos,
+        values=total_interactions,
+        hole=0.3,
+        marker=dict(colors=colors[:len(videos)]),
+        textinfo='label+percent',
+        textfont={'family': 'Microsoft YaHei', 'size': 12},
+        hovertemplate='<b>%{label}</b><br>互动数：%{value:,}<br>占比：%{percent}<extra></extra>'
+    )])
+
+    fig.update_layout(
+        title={
+            'text': '各视频互动数占比',
+            'font': {'size': 20, 'family': 'Microsoft YaHei', 'color': '#2C3E50'},
+            'y': 0.95,
+            'x': 0.5
+        },
+        showlegend=True,
+        legend={
+            'orientation': 'h',
+            'y': -0.1,
+            'x': 0.5,
+            'xanchor': 'center',
+            'font': {'size': 12, 'family': 'Microsoft YaHei'}
+        },
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font={'family': 'Microsoft YaHei'},
+        margin={'t': 60, 'l': 40, 'r': 40, 'b': 80},
+        height=500
+    )
+
+    return fig
+
+
+def create_video_detail_card(video_name, data):
+    if video_name is None:
+        return html.Div(
+            '点击饼图中的扇区查看视频详细信息',
+            style={
+                'textAlign': 'center',
+                'color': '#7F8C8D',
+                'fontFamily': 'Microsoft YaHei',
+                'fontSize': '14px',
+                'padding': '40px 20px'
+            }
+        )
+
+    videos = data['videos']
+    likes = data['likes']
+    comments = data['comments']
+    shares = data['shares']
+
+    try:
+        idx = videos.index(video_name)
+    except ValueError:
+        return html.Div(
+            '未找到该视频信息',
+            style={
+                'textAlign': 'center',
+                'color': '#E74C3C',
+                'fontFamily': 'Microsoft YaHei',
+                'fontSize': '14px',
+                'padding': '40px 20px'
+            }
+        )
+
+    video_likes = likes[idx]
+    video_comments = comments[idx]
+    video_shares = shares[idx]
+    video_total = video_likes + video_comments + video_shares
+
+    total_all = sum(likes) + sum(comments) + sum(shares)
+    percentage = (video_total / total_all * 100) if total_all > 0 else 0
+
+    return html.Div([
+        html.Div([
+            html.Span('🎬', style={'fontSize': '28px', 'marginRight': '12px'}),
+            html.Span(video_name, style={
+                'fontFamily': 'Microsoft YaHei',
+                'fontSize': '22px',
+                'fontWeight': 'bold',
+                'color': '#2C3E50'
+            })
+        ], style={
+            'display': 'flex',
+            'alignItems': 'center',
+            'paddingBottom': '20px',
+            'borderBottom': '2px solid #E8E8E8',
+            'marginBottom': '20px'
+        }),
+        html.Div([
+            html.Div([
+                html.Div('👍 点赞数', style={
+                    'color': '#7F8C8D',
+                    'fontSize': '14px',
+                    'marginBottom': '8px'
+                }),
+                html.Div(f'{video_likes:,}', style={
+                    'color': '#FF6B6B',
+                    'fontSize': '28px',
+                    'fontWeight': 'bold'
+                })
+            ], style={
+                'flex': '1',
+                'textAlign': 'center',
+                'padding': '15px',
+                'backgroundColor': '#FFF5F5',
+                'borderRadius': '8px',
+                'margin': '0 8px'
+            }),
+            html.Div([
+                html.Div('💬 评论数', style={
+                    'color': '#7F8C8D',
+                    'fontSize': '14px',
+                    'marginBottom': '8px'
+                }),
+                html.Div(f'{video_comments:,}', style={
+                    'color': '#4ECDC4',
+                    'fontSize': '28px',
+                    'fontWeight': 'bold'
+                })
+            ], style={
+                'flex': '1',
+                'textAlign': 'center',
+                'padding': '15px',
+                'backgroundColor': '#F0FFFE',
+                'borderRadius': '8px',
+                'margin': '0 8px'
+            }),
+            html.Div([
+                html.Div('📤 分享数', style={
+                    'color': '#7F8C8D',
+                    'fontSize': '14px',
+                    'marginBottom': '8px'
+                }),
+                html.Div(f'{video_shares:,}', style={
+                    'color': '#FFE66D',
+                    'fontSize': '28px',
+                    'fontWeight': 'bold'
+                })
+            ], style={
+                'flex': '1',
+                'textAlign': 'center',
+                'padding': '15px',
+                'backgroundColor': '#FFFDF0',
+                'borderRadius': '8px',
+                'margin': '0 8px'
+            }),
+            html.Div([
+                html.Div('📊 总互动', style={
+                    'color': '#7F8C8D',
+                    'fontSize': '14px',
+                    'marginBottom': '8px'
+                }),
+                html.Div(f'{video_total:,}', style={
+                    'color': '#9B59B6',
+                    'fontSize': '28px',
+                    'fontWeight': 'bold'
+                })
+            ], style={
+                'flex': '1',
+                'textAlign': 'center',
+                'padding': '15px',
+                'backgroundColor': '#FAF5FF',
+                'borderRadius': '8px',
+                'margin': '0 8px'
+            })
+        ], style={
+            'display': 'flex',
+            'flexWrap': 'wrap',
+            'marginBottom': '20px'
+        }),
+        html.Div([
+            html.Div('占总互动数比例', style={
+                'color': '#7F8C8D',
+                'fontSize': '14px',
+                'marginBottom': '10px'
+            }),
+            html.Div([
+                html.Div(style={
+                    'width': f'{percentage}%',
+                    'height': '24px',
+                    'backgroundColor': '#9B59B6',
+                    'borderRadius': '12px',
+                    'transition': 'width 0.5s ease'
+                }),
+                html.Div(f'{percentage:.2f}%', style={
+                    'position': 'absolute',
+                    'top': '50%',
+                    'left': '50%',
+                    'transform': 'translate(-50%, -50%)',
+                    'color': '#2C3E50',
+                    'fontWeight': 'bold',
+                    'fontSize': '14px'
+                })
+            ], style={
+                'position': 'relative',
+                'width': '100%',
+                'height': '24px',
+                'backgroundColor': '#F0F0F0',
+                'borderRadius': '12px',
+                'overflow': 'hidden'
+            })
+        ])
+    ], style={
+        'backgroundColor': '#FFFFFF',
+        'borderRadius': '12px',
+        'padding': '25px',
+        'boxShadow': '0 4px 12px rgba(0,0,0,0.1)'
+    })
+
+
 def create_ranking_panel(data):
     rankings = calculate_rankings(data, top_n=3)
 
@@ -265,42 +492,78 @@ def create_ranking_panel(data):
 
 initial_data = get_data_by_period('today')
 initial_fig = create_chart_figure(initial_data)
+initial_pie_fig = create_pie_chart_figure(initial_data)
 initial_trend_fig = create_trend_chart_figure()
 initial_table_data = create_table_data(initial_data)
 initial_ranking_panel = create_ranking_panel(initial_data)
+initial_video_detail = create_video_detail_card(None, initial_data)
 
 app.layout = html.Div([
+    dcc.Download(id='download-csv'),
     html.Div(
         className='header',
         children=[
-            html.H1(
-                '📊 内容互动分析仪表盘',
-                style={
-                    'textAlign': 'center',
-                    'color': '#2C3E50',
-                    'margin': '0',
-                    'padding': '20px 0',
-                    'fontFamily': 'Microsoft YaHei',
-                    'fontSize': '28px'
-                }
-            ),
-            html.P(
-                '实时监测内容互动表现 - 点赞、评论、分享数据分析',
-                style={
-                    'textAlign': 'center',
-                    'color': '#7F8C8D',
-                    'margin': '0',
-                    'padding': '0 0 20px 0',
-                    'fontFamily': 'Microsoft YaHei',
-                    'fontSize': '14px'
-                }
-            )
+            html.Div([
+                html.H1(
+                    '📊 内容互动分析仪表盘',
+                    style={
+                        'color': '#2C3E50',
+                        'margin': '0',
+                        'fontFamily': 'Microsoft YaHei',
+                        'fontSize': '28px'
+                    }
+                ),
+                html.P(
+                    '实时监测内容互动表现 - 点赞、评论、分享数据分析',
+                    style={
+                        'color': '#7F8C8D',
+                        'margin': '5px 0 0 0',
+                        'fontFamily': 'Microsoft YaHei',
+                        'fontSize': '14px'
+                    }
+                )
+            ], style={
+                'flex': '1',
+                'textAlign': 'center'
+            }),
+            html.Div([
+                html.Button(
+                    [
+                        html.Span('📥', style={'marginRight': '6px'}),
+                        '导出数据'
+                    ],
+                    id='export-button',
+                    n_clicks=0,
+                    style={
+                        'backgroundColor': '#3498DB',
+                        'color': '#FFFFFF',
+                        'border': 'none',
+                        'borderRadius': '6px',
+                        'padding': '10px 20px',
+                        'fontFamily': 'Microsoft YaHei',
+                        'fontSize': '14px',
+                        'fontWeight': 'bold',
+                        'cursor': 'pointer',
+                        'boxShadow': '0 2px 6px rgba(52, 152, 219, 0.3)',
+                        'transition': 'all 0.3s ease'
+                    }
+                )
+            ], style={
+                'position': 'absolute',
+                'right': '25px',
+                'top': '50%',
+                'transform': 'translateY(-50%)'
+            })
         ],
         style={
             'backgroundColor': '#FFFFFF',
             'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
             'borderRadius': '8px',
-            'margin': '20px 20px 0 20px'
+            'margin': '20px 20px 0 20px',
+            'padding': '20px 0',
+            'position': 'relative',
+            'display': 'flex',
+            'alignItems': 'center'
         }
     ),
 
@@ -447,23 +710,49 @@ app.layout = html.Div([
                         }
                     ),
 
-                    html.Div(
-                        className='chart-container',
-                        children=[
-                            dcc.Graph(
-                                id='stacked-bar-chart',
-                                figure=initial_fig,
-                                style={'height': '500px'}
-                            )
-                        ],
-                        style={
-                            'backgroundColor': '#FFFFFF',
-                            'borderRadius': '8px',
-                            'padding': '20px',
-                            'margin': '20px 0 0 0',
-                            'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
-                        }
-                    ),
+                    html.Div([
+                        html.Div(
+                            className='chart-container',
+                            children=[
+                                dcc.Graph(
+                                    id='stacked-bar-chart',
+                                    figure=initial_fig,
+                                    style={'height': '500px'}
+                                )
+                            ],
+                            style={
+                                'backgroundColor': '#FFFFFF',
+                                'borderRadius': '8px',
+                                'padding': '20px',
+                                'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
+                                'flex': '1 1 500px',
+                                'minWidth': '0'
+                            }
+                        ),
+                        html.Div(
+                            className='pie-chart-container',
+                            children=[
+                                dcc.Graph(
+                                    id='pie-chart',
+                                    figure=initial_pie_fig,
+                                    style={'height': '500px'}
+                                )
+                            ],
+                            style={
+                                'backgroundColor': '#FFFFFF',
+                                'borderRadius': '8px',
+                                'padding': '20px',
+                                'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
+                                'flex': '1 1 400px',
+                                'minWidth': '0'
+                            }
+                        )
+                    ], style={
+                        'display': 'flex',
+                        'flexWrap': 'wrap',
+                        'gap': '20px',
+                        'margin': '20px 0 0 0'
+                    }),
 
                     html.Div(
                         className='trend-chart-container',
@@ -574,6 +863,33 @@ app.layout = html.Div([
     ),
 
     html.Div(
+        className='video-detail-container',
+        id='video-detail-container',
+        children=[
+            html.H3(
+                '📋 视频详细信息',
+                style={
+                    'fontFamily': 'Microsoft YaHei',
+                    'color': '#2C3E50',
+                    'margin': '0 0 15px 0',
+                    'fontSize': '18px'
+                }
+            ),
+            html.Div(
+                id='video-detail-card',
+                children=initial_video_detail
+            )
+        ],
+        style={
+            'backgroundColor': '#FFFFFF',
+            'borderRadius': '8px',
+            'padding': '20px',
+            'margin': '20px 20px 0 20px',
+            'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
+        }
+    ),
+
+    html.Div(
         className='footer',
         children=[
             html.P(
@@ -600,11 +916,14 @@ app.layout = html.Div([
      Output('total-shares', 'children'),
      Output('total-interactions', 'children'),
      Output('stacked-bar-chart', 'figure'),
+     Output('pie-chart', 'figure'),
      Output('video-data-table', 'data'),
-     Output('ranking-sidebar', 'children')],
-    [Input('time-period-dropdown', 'value')]
+     Output('ranking-sidebar', 'children'),
+     Output('video-detail-card', 'children')],
+    [Input('time-period-dropdown', 'value')],
+    [State('pie-chart', 'clickData')]
 )
-def update_dashboard(selected_period):
+def update_dashboard(selected_period, pie_click_data):
     data = get_data_by_period(selected_period)
 
     total_likes = f'{sum(data["likes"]):,}'
@@ -613,13 +932,55 @@ def update_dashboard(selected_period):
     total_interactions = f'{sum(data["likes"]) + sum(data["comments"]) + sum(data["shares"]):,}'
 
     figure = create_chart_figure(data)
+    pie_figure = create_pie_chart_figure(data)
     table_data = create_table_data(data)
     ranking_panel = create_ranking_panel(data)
 
-    return total_likes, total_comments, total_shares, total_interactions, figure, table_data, ranking_panel
+    selected_video = None
+    if pie_click_data and 'points' in pie_click_data and len(pie_click_data['points']) > 0:
+        selected_video = pie_click_data['points'][0].get('label')
+    video_detail = create_video_detail_card(selected_video, data)
+
+    return total_likes, total_comments, total_shares, total_interactions, figure, pie_figure, table_data, ranking_panel, video_detail
+
+
+@app.callback(
+    Output('download-csv', 'data'),
+    [Input('export-button', 'n_clicks')],
+    [State('time-period-dropdown', 'value')]
+)
+def export_csv(n_clicks, selected_period):
+    if n_clicks is None or n_clicks == 0:
+        return no_update
+
+    data = get_data_by_period(selected_period)
+    period_labels = {
+        'today': '今日',
+        'week': '本周',
+        'month': '本月'
+    }
+    period_label = period_labels.get(selected_period, '数据')
+
+    return export_data_to_csv(data, period_label)
+
+
+@app.callback(
+    Output('video-detail-card', 'children', allow_duplicate=True),
+    [Input('pie-chart', 'clickData')],
+    [State('time-period-dropdown', 'value')],
+    prevent_initial_call=True
+)
+def update_video_detail_from_pie(click_data, selected_period):
+    data = get_data_by_period(selected_period)
+
+    if click_data is None or 'points' not in click_data or len(click_data['points']) == 0:
+        return create_video_detail_card(None, data)
+
+    selected_video = click_data['points'][0].get('label')
+    return create_video_detail_card(selected_video, data)
 
 
 if __name__ == '__main__':
     print("启动内容互动分析页面...")
-    print("访问地址：http://127.0.0.1:8050")
-    app.run(debug=True, host='127.0.0.1', port=8050)
+    print("访问地址：http://127.0.0.1:8051")
+    app.run(debug=True, host='127.0.0.1', port=8051)
