@@ -6,6 +6,7 @@ from mock_data import get_data_by_period, TIME_PERIOD_DATA, CATEGORIES
 from utils import calculate_rankings, format_ranking_items, get_aggregated_trend_data, format_number
 from export_utils import export_data_to_csv
 from category_utils import filter_data_by_category, get_category_summary_rows, get_category_bar_traces, filter_all_periods_by_category
+from data_timer import data_timer
 
 app = dash.Dash(__name__)
 app.title = "内容互动分析"
@@ -572,20 +573,119 @@ def create_ranking_panel(data):
     ])
 
 
-initial_data = get_data_by_period('today')
+def create_change_indicators(period, selected_category='all'):
+    changes = data_timer.calculate_changes(period)
+
+    if selected_category != 'all':
+        from mock_data import VIDEO_CATEGORIES
+        changes = [c for c in changes if VIDEO_CATEGORIES.get(c['video']) == selected_category]
+
+    indicator_items = []
+    for change in changes:
+        video_name = change['video']
+
+        def get_indicator(value):
+            direction = data_timer.get_change_direction(value)
+            if direction == 'up':
+                return {'icon': '↑', 'color': '#27AE60', 'text': data_timer.format_change(value)}
+            elif direction == 'down':
+                return {'icon': '↓', 'color': '#E74C3C', 'text': data_timer.format_change(value)}
+            else:
+                return {'icon': '→', 'color': '#7F8C8D', 'text': '0'}
+
+        likes_ind = get_indicator(change['likes_change'])
+        comments_ind = get_indicator(change['comments_change'])
+        shares_ind = get_indicator(change['shares_change'])
+        total_ind = get_indicator(change['total_change'])
+
+        indicator_items.append(
+            html.Div([
+                html.Div([
+                    html.Div(video_name, style={
+                        'fontFamily': 'Microsoft YaHei',
+                        'fontSize': '13px',
+                        'fontWeight': 'bold',
+                        'color': '#2C3E50',
+                        'marginBottom': '8px'
+                    }),
+                    html.Div([
+                        html.Div([
+                            html.Span('👍', style={'marginRight': '4px', 'fontSize': '12px'}),
+                            html.Span(likes_ind['icon'], style={'color': likes_ind['color'], 'fontWeight': 'bold', 'fontSize': '14px', 'marginRight': '3px'}),
+                            html.Span(likes_ind['text'], style={'color': likes_ind['color'], 'fontSize': '12px'})
+                        ], style={'display': 'flex', 'alignItems': 'center', 'margin': '3px 10px 3px 0'}),
+                        html.Div([
+                            html.Span('💬', style={'marginRight': '4px', 'fontSize': '12px'}),
+                            html.Span(comments_ind['icon'], style={'color': comments_ind['color'], 'fontWeight': 'bold', 'fontSize': '14px', 'marginRight': '3px'}),
+                            html.Span(comments_ind['text'], style={'color': comments_ind['color'], 'fontSize': '12px'})
+                        ], style={'display': 'flex', 'alignItems': 'center', 'margin': '3px 10px 3px 0'}),
+                        html.Div([
+                            html.Span('📤', style={'marginRight': '4px', 'fontSize': '12px'}),
+                            html.Span(shares_ind['icon'], style={'color': shares_ind['color'], 'fontWeight': 'bold', 'fontSize': '14px', 'marginRight': '3px'}),
+                            html.Span(shares_ind['text'], style={'color': shares_ind['color'], 'fontSize': '12px'})
+                        ], style={'display': 'flex', 'alignItems': 'center', 'margin': '3px 0'}),
+                    ], style={'display': 'flex', 'flexWrap': 'wrap'}),
+                    html.Div([
+                        html.Span('总变化：', style={'fontSize': '12px', 'color': '#7F8C8D'}),
+                        html.Span(total_ind['icon'], style={'color': total_ind['color'], 'fontWeight': 'bold', 'fontSize': '14px', 'marginRight': '3px'}),
+                        html.Span(total_ind['text'], style={'color': total_ind['color'], 'fontSize': '12px', 'fontWeight': 'bold'})
+                    ], style={'marginTop': '5px', 'display': 'flex', 'alignItems': 'center'})
+                ], style={
+                    'backgroundColor': '#FAFAFA',
+                    'borderRadius': '6px',
+                    'padding': '10px 12px',
+                    'margin': '5px',
+                    'flex': '1 1 200px',
+                    'minWidth': '180px'
+                })
+            ])
+        )
+
+    return html.Div([
+        html.Div([
+            html.Span('📊 数据变化指示器', style={
+                'fontFamily': 'Microsoft YaHei',
+                'fontSize': '16px',
+                'fontWeight': 'bold',
+                'color': '#2C3E50'
+            }),
+            html.Span('（相比上次更新）', style={'fontSize': '12px', 'color': '#7F8C8D', 'marginLeft': '8px'})
+        ], style={
+            'marginBottom': '12px'
+        }),
+        html.Div(
+            indicator_items,
+            style={
+                'display': 'flex',
+                'flexWrap': 'wrap',
+                'gap': '8px'
+            }
+        )
+    ])
+
+
+initial_data = data_timer.get_data_by_period('today')
 initial_fig = create_chart_figure(initial_data)
 initial_pie_fig = create_pie_chart_figure(initial_data)
-initial_trend_fig = create_trend_chart_figure()
+initial_trend_fig = create_trend_chart_figure(data_timer.get_all_periods_data())
 initial_table_data = create_table_data(initial_data)
 initial_ranking_panel = create_ranking_panel(initial_data)
 initial_video_detail = create_video_detail_card(None, initial_data)
 initial_category_bar_fig = create_category_bar_chart_figure(initial_data)
 initial_category_summary = get_category_summary_rows(initial_data)
+initial_change_indicators = create_change_indicators('today')
 
 app.layout = html.Div([
     dcc.Download(id='download-csv'),
     dcc.Store(id='selected-video-store', data=None),
     dcc.Store(id='scroll-trigger', data=0),
+    dcc.Store(id='refresh-trigger', data=0),
+    dcc.Interval(
+        id='auto-refresh-interval',
+        interval=30 * 1000,
+        n_intervals=0,
+        disabled=True
+    ),
     html.Div(
         className='header',
         children=[
@@ -613,6 +713,59 @@ app.layout = html.Div([
                 'textAlign': 'center'
             }),
             html.Div([
+                html.Div([
+                    html.Label(
+                        '自动刷新',
+                        style={
+                            'fontFamily': 'Microsoft YaHei',
+                            'fontSize': '13px',
+                            'color': '#2C3E50',
+                            'marginRight': '8px'
+                        }
+                    ),
+                    dcc.Checklist(
+                        id='auto-refresh-toggle',
+                        options=[
+                            {'label': '', 'value': 'on'}
+                        ],
+                        value=[],
+                        style={
+                            'display': 'inline-block',
+                            'marginRight': '15px'
+                        },
+                        inputStyle={
+                            'width': '16px',
+                            'height': '16px',
+                            'cursor': 'pointer'
+                        }
+                    )
+                ], style={
+                    'display': 'inline-flex',
+                    'alignItems': 'center',
+                    'marginRight': '10px'
+                }),
+                html.Button(
+                    [
+                        html.Span('🔄', style={'marginRight': '6px'}),
+                        '刷新数据'
+                    ],
+                    id='refresh-button',
+                    n_clicks=0,
+                    style={
+                        'backgroundColor': '#27AE60',
+                        'color': '#FFFFFF',
+                        'border': 'none',
+                        'borderRadius': '6px',
+                        'padding': '10px 20px',
+                        'fontFamily': 'Microsoft YaHei',
+                        'fontSize': '14px',
+                        'fontWeight': 'bold',
+                        'cursor': 'pointer',
+                        'boxShadow': '0 2px 6px rgba(39, 174, 96, 0.3)',
+                        'transition': 'all 0.3s ease',
+                        'marginRight': '10px'
+                    }
+                ),
                 html.Button(
                     [
                         html.Span('📥', style={'marginRight': '6px'}),
@@ -638,7 +791,9 @@ app.layout = html.Div([
                 'position': 'absolute',
                 'right': '25px',
                 'top': '50%',
-                'transform': 'translateY(-50%)'
+                'transform': 'translateY(-50%)',
+                'display': 'flex',
+                'alignItems': 'center'
             })
         ],
         style={
@@ -710,6 +865,20 @@ app.layout = html.Div([
                         className='stats-cards',
                         id='stats-cards',
                         children=[
+                            html.Div(
+                                id='update-time-label',
+                                children=[
+                                    html.Span('🕐', style={'marginRight': '8px'}),
+                                    html.Span('最后更新时间：', style={'fontFamily': 'Microsoft YaHei', 'fontSize': '14px', 'color': '#7F8C8D'}),
+                                    html.Span(id='last-update-time', children=data_timer.get_last_update_time(), style={'fontFamily': 'Microsoft YaHei', 'fontSize': '14px', 'color': '#2C3E50', 'fontWeight': 'bold'})
+                                ],
+                                style={
+                                    'width': '100%',
+                                    'textAlign': 'right',
+                                    'marginBottom': '10px',
+                                    'paddingRight': '10px'
+                                }
+                            ),
                             html.Div(
                                 className='stat-card',
                                 children=[
@@ -846,6 +1015,15 @@ app.layout = html.Div([
                                     id='stacked-bar-chart',
                                     figure=initial_fig,
                                     style={'height': '500px'}
+                                ),
+                                html.Div(
+                                    id='change-indicator-container',
+                                    children=initial_change_indicators,
+                                    style={
+                                        'marginTop': '15px',
+                                        'paddingTop': '15px',
+                                        'borderTop': '1px solid #E8E8E8'
+                                    }
                                 )
                             ],
                             style={
@@ -1129,12 +1307,23 @@ app.layout = html.Div([
      Output('video-detail-card', 'children'),
      Output('selected-video-store', 'data'),
      Output('category-bar-chart', 'figure'),
-     Output('category-summary-table', 'data')],
+     Output('category-summary-table', 'data'),
+     Output('last-update-time', 'children'),
+     Output('change-indicator-container', 'children')],
     [Input('time-period-dropdown', 'value'),
-     Input('category-radio', 'value')]
+     Input('category-radio', 'value'),
+     Input('refresh-button', 'n_clicks'),
+     Input('auto-refresh-interval', 'n_intervals')],
+    [State('refresh-trigger', 'data')]
 )
-def update_dashboard(selected_period, selected_category):
-    raw_data = get_data_by_period(selected_period)
+def update_dashboard(selected_period, selected_category, refresh_clicks, auto_intervals, refresh_trigger):
+    ctx = dash.callback_context
+    triggered = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    if triggered in ['refresh-button', 'auto-refresh-interval']:
+        data_timer.refresh_data()
+
+    raw_data = data_timer.get_data_by_period(selected_period)
     data = filter_data_by_category(raw_data, selected_category)
 
     total_likes = f'{sum(data["likes"]):,}'
@@ -1145,7 +1334,7 @@ def update_dashboard(selected_period, selected_category):
     figure = create_chart_figure(data)
     pie_figure = create_pie_chart_figure(data)
 
-    filtered_all_periods = filter_all_periods_by_category(TIME_PERIOD_DATA, selected_category)
+    filtered_all_periods = filter_all_periods_by_category(data_timer.get_all_periods_data(), selected_category)
     trend_figure = create_trend_chart_figure(filtered_all_periods)
 
     table_data = create_table_data(data)
@@ -1156,7 +1345,10 @@ def update_dashboard(selected_period, selected_category):
     category_bar_fig = create_category_bar_chart_figure(data)
     category_summary = get_category_summary_rows(data)
 
-    return total_likes, total_comments, total_shares, total_interactions, figure, pie_figure, trend_figure, table_data, ranking_panel, video_detail, None, category_bar_fig, category_summary
+    last_update_time = data_timer.get_last_update_time()
+    change_indicators = create_change_indicators(selected_period, selected_category)
+
+    return total_likes, total_comments, total_shares, total_interactions, figure, pie_figure, trend_figure, table_data, ranking_panel, video_detail, None, category_bar_fig, category_summary, last_update_time, change_indicators
 
 
 @app.callback(
@@ -1169,7 +1361,7 @@ def export_csv(n_clicks, selected_period, selected_category):
     if n_clicks is None or n_clicks == 0:
         return no_update
 
-    raw_data = get_data_by_period(selected_period)
+    raw_data = data_timer.get_data_by_period(selected_period)
     data = filter_data_by_category(raw_data, selected_category)
     period_labels = {
         'today': '今日',
@@ -1205,9 +1397,17 @@ def handle_pie_click(click_data, current_scroll_trigger):
     prevent_initial_call=True
 )
 def update_video_detail_from_store(selected_video, selected_period, selected_category):
-    raw_data = get_data_by_period(selected_period)
+    raw_data = data_timer.get_data_by_period(selected_period)
     data = filter_data_by_category(raw_data, selected_category)
     return create_video_detail_card(selected_video, data)
+
+
+@app.callback(
+    Output('auto-refresh-interval', 'disabled'),
+    [Input('auto-refresh-toggle', 'value')]
+)
+def toggle_auto_refresh(toggle_value):
+    return 'on' not in toggle_value
 
 
 app.clientside_callback(
