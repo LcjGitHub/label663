@@ -68,5 +68,31 @@ def get_trend_data(all_periods_data):
     }
 
 
+def get_aggregated_trend_data(all_periods_data):
+    periods = list(all_periods_data.keys())
+    period_labels = {
+        'today': '今日',
+        'week': '本周',
+        'month': '本月'
+    }
+
+    total_likes = []
+    total_comments = []
+    total_shares = []
+
+    for period in periods:
+        data = all_periods_data[period]
+        total_likes.append(sum(data['likes']))
+        total_comments.append(sum(data['comments']))
+        total_shares.append(sum(data['shares']))
+
+    return {
+        'periods': [period_labels[p] for p in periods],
+        'total_likes': total_likes,
+        'total_comments': total_comments,
+        'total_shares': total_shares
+    }
+
+
 def format_number(num):
     return f'{num:,}'

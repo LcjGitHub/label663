@@ -3,7 +3,7 @@ from dash import html, dcc, dash_table, Input, Output, State
 import plotly.graph_objects as go
 import numpy as np
 from mock_data import get_data_by_period, TIME_PERIOD_DATA
-from utils import calculate_rankings, format_ranking_items, get_trend_data, format_number
+from utils import calculate_rankings, format_ranking_items, get_aggregated_trend_data, format_number
 
 app = dash.Dash(__name__)
 app.title = "内容互动分析"
@@ -106,51 +106,43 @@ def create_table_data(data):
 
 
 def create_trend_chart_figure():
-    trend_info = get_trend_data(TIME_PERIOD_DATA)
+    trend_info = get_aggregated_trend_data(TIME_PERIOD_DATA)
     periods = trend_info['periods']
-    videos = trend_info['videos']
-    trend_by_video = trend_info['trend_by_video']
+    total_likes = trend_info['total_likes']
+    total_comments = trend_info['total_comments']
+    total_shares = trend_info['total_shares']
 
     fig = go.Figure()
 
-    for video in videos:
-        fig.add_trace(go.Scatter(
-            x=periods,
-            y=trend_by_video[video]['likes'],
-            mode='lines+markers',
-            name=f'{video} - 点赞',
-            line=dict(color='#FF6B6B', width=2),
-            marker=dict(size=8),
-            hovertemplate='<b>%{x}</b><br>' + f'{video}<br>' + '点赞：%{y}<extra></extra>',
-            legendgroup='likes',
-            visible=True
-        ))
+    fig.add_trace(go.Scatter(
+        x=periods,
+        y=total_likes,
+        mode='lines+markers',
+        name='点赞合计',
+        line=dict(color='#FF6B6B', width=3),
+        marker=dict(size=10),
+        hovertemplate='<b>%{x}</b><br>点赞合计：%{y:,}<extra></extra>'
+    ))
 
-    for video in videos:
-        fig.add_trace(go.Scatter(
-            x=periods,
-            y=trend_by_video[video]['comments'],
-            mode='lines+markers',
-            name=f'{video} - 评论',
-            line=dict(color='#4ECDC4', width=2),
-            marker=dict(size=8),
-            hovertemplate='<b>%{x}</b><br>' + f'{video}<br>' + '评论：%{y}<extra></extra>',
-            legendgroup='comments',
-            visible='legendonly'
-        ))
+    fig.add_trace(go.Scatter(
+        x=periods,
+        y=total_comments,
+        mode='lines+markers',
+        name='评论合计',
+        line=dict(color='#4ECDC4', width=3),
+        marker=dict(size=10),
+        hovertemplate='<b>%{x}</b><br>评论合计：%{y:,}<extra></extra>'
+    ))
 
-    for video in videos:
-        fig.add_trace(go.Scatter(
-            x=periods,
-            y=trend_by_video[video]['shares'],
-            mode='lines+markers',
-            name=f'{video} - 分享',
-            line=dict(color='#FFE66D', width=2),
-            marker=dict(size=8),
-            hovertemplate='<b>%{x}</b><br>' + f'{video}<br>' + '分享：%{y}<extra></extra>',
-            legendgroup='shares',
-            visible='legendonly'
-        ))
+    fig.add_trace(go.Scatter(
+        x=periods,
+        y=total_shares,
+        mode='lines+markers',
+        name='分享合计',
+        line=dict(color='#FFE66D', width=3),
+        marker=dict(size=10),
+        hovertemplate='<b>%{x}</b><br>分享合计：%{y:,}<extra></extra>'
+    ))
 
     fig.update_layout(
         title={
@@ -164,23 +156,22 @@ def create_trend_chart_figure():
             'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
         },
         yaxis_title={
-            'text': '互动数量',
+            'text': '互动合计数量',
             'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
         },
         hovermode='x unified',
         showlegend=True,
         legend={
             'orientation': 'h',
-            'y': -0.3,
+            'y': -0.2,
             'x': 0.5,
             'xanchor': 'center',
-            'font': {'size': 11, 'family': 'Microsoft YaHei'},
-            'groupclick': 'toggleitem'
+            'font': {'size': 13, 'family': 'Microsoft YaHei'}
         },
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
         font={'family': 'Microsoft YaHei'},
-        margin={'t': 60, 'l': 60, 'r': 40, 'b': 120},
+        margin={'t': 60, 'l': 60, 'r': 40, 'b': 100},
         height=450
     )
 
@@ -268,7 +259,7 @@ def create_ranking_panel(data):
         ),
         create_ranking_section('点赞排行榜', likes_items, '#FF6B6B', '👍'),
         create_ranking_section('评论排行榜', comments_items, '#4ECDC4', '💬'),
-        create_ranking_section('分享排行榜', shares_items, '#FFA500', '📤')
+        create_ranking_section('分享排行榜', shares_items, '#FFE66D', '📤')
     ])
 
 
@@ -552,9 +543,8 @@ app.layout = html.Div([
                     )
                 ],
                 style={
-                    'flex': '1',
-                    'minWidth': '0',
-                    'marginRight': '20px'
+                    'flex': '1 1 600px',
+                    'minWidth': '0'
                 }
             ),
 
@@ -563,8 +553,7 @@ app.layout = html.Div([
                 id='ranking-sidebar',
                 children=initial_ranking_panel,
                 style={
-                    'width': '300px',
-                    'flexShrink': '0',
+                    'flex': '1 1 300px',
                     'backgroundColor': '#FFFFFF',
                     'borderRadius': '8px',
                     'padding': '25px',
@@ -577,9 +566,10 @@ app.layout = html.Div([
         ],
         style={
             'display': 'flex',
+            'flexWrap': 'wrap',
             'alignItems': 'flex-start',
             'margin': '20px',
-            'gap': '0'
+            'gap': '20px'
         }
     ),
 
