@@ -48,7 +48,7 @@ def create_chart_figure(data):
             'x': 0.5
         },
         xaxis_title={
-            'text': '内容类别',
+            'text': '视频名称',
             'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
         },
         yaxis_title={
@@ -96,10 +96,10 @@ def create_table_data(data):
         total = likes[i] + comments[i] + shares[i]
         table_rows.append({
             'video_name': videos[i],
-            'likes': likes[i],
-            'comments': comments[i],
-            'shares': shares[i],
-            'total': total
+            'likes': f'{likes[i]:,}',
+            'comments': f'{comments[i]:,}',
+            'shares': f'{shares[i]:,}',
+            'total': f'{total:,}'
         })
     return table_rows
 
@@ -361,7 +361,7 @@ app.layout = html.Div([
         className='footer',
         children=[
             html.P(
-                '数据来源：Mock 数据 | 更新时间：2026-06-09',
+                '数据来源：模拟数据 | 更新时间：2026-06-09',
                 style={
                     'textAlign': 'center',
                     'color': '#BDC3C7',
@@ -402,6 +402,6 @@ def update_dashboard(selected_period):
 
 
 if __name__ == '__main__':
-    print("🚀 启动内容互动分析页面...")
-    print("📊 访问地址：http://127.0.0.1:8050")
+    print("启动内容互动分析页面...")
+    print("访问地址：http://127.0.0.1:8050")
     app.run(debug=True, host='127.0.0.1', port=8050)
