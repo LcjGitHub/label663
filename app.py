@@ -2,10 +2,10 @@ import dash
 from dash import html, dcc, dash_table, Input, Output, State, no_update
 import plotly.graph_objects as go
 import numpy as np
-from mock_data import get_data_by_period, TIME_PERIOD_DATA, CATEGORIES
+from mock_data import get_data_by_period, TIME_PERIOD_DATA, CATEGORIES, CATEGORY_HIERARCHY, VIDEO_CATEGORIES, VIDEO_SECONDARY_CATEGORIES
 from utils import calculate_rankings, format_ranking_items, get_aggregated_trend_data, format_number, calculate_growth_rates, calculate_growth_rankings
 from export_utils import export_data_to_csv
-from category_utils import filter_data_by_category, get_category_summary_rows, get_category_bar_traces, filter_all_periods_by_category
+from category_utils import filter_data_by_category, get_category_summary_rows, get_category_bar_traces, filter_all_periods_by_category, get_secondary_categories
 from data_timer import data_timer
 
 app = dash.Dash(__name__)
@@ -92,6 +92,7 @@ def create_chart_figure(data):
 def create_table_data(data):
     videos = data['videos']
     categories = data.get('categories', [])
+    secondary_categories = data.get('secondary_categories', [])
     likes = data['likes']
     comments = data['comments']
     shares = data['shares']
@@ -99,9 +100,11 @@ def create_table_data(data):
     table_rows = []
     for i in range(len(videos)):
         total = likes[i] + comments[i] + shares[i]
+        primary = categories[i] if i < len(categories) else '-'
+        secondary = secondary_categories[i] if i < len(secondary_categories) else '-'
         table_rows.append({
             'video_name': videos[i],
-            'category': categories[i] if i < len(categories) else '-',
+            'category': f'{primary} / {secondary}',
             'likes': f'{likes[i]:,}',
             'comments': f'{comments[i]:,}',
             'shares': f'{shares[i]:,}',
@@ -572,12 +575,13 @@ def create_ranking_panel(data, ranking_mode='absolute', changes_data=None):
     ])
 
 
-def create_change_indicators(period, selected_category='all', start_date=None, end_date=None):
+def create_change_indicators(period, primary_category='all', secondary_category='all', start_date=None, end_date=None):
     changes = data_timer.calculate_changes(period, start_date, end_date)
 
-    if selected_category != 'all':
-        from mock_data import VIDEO_CATEGORIES
-        changes = [c for c in changes if VIDEO_CATEGORIES.get(c['video']) == selected_category]
+    if primary_category != 'all':
+        changes = [c for c in changes if VIDEO_CATEGORIES.get(c['video']) == primary_category]
+    if secondary_category != 'all':
+        changes = [c for c in changes if VIDEO_SECONDARY_CATEGORIES.get(c['video']) == secondary_category]
 
     indicator_items = []
     for change in changes:
@@ -1065,21 +1069,48 @@ app.layout = html.Div([
                                     'fontWeight': 'bold'
                                 }
                             ),
-                            dcc.RadioItems(
-                                id='category-radio',
+                            html.Label(
+                                '一级分类：',
+                                style={
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '14px',
+                                    'color': '#2C3E50',
+                                    'marginRight': '8px'
+                                }
+                            ),
+                            dcc.Dropdown(
+                                id='primary-category-dropdown',
                                 options=[
                                     {'label': '全部', 'value': 'all'}
                                 ] + [{'label': cat, 'value': cat} for cat in CATEGORIES],
                                 value='all',
-                                labelStyle={
-                                    'display': 'inline-block',
-                                    'marginRight': '20px',
+                                clearable=False,
+                                style={
+                                    'width': '180px',
                                     'fontFamily': 'Microsoft YaHei',
                                     'fontSize': '14px',
-                                    'color': '#34495E'
-                                },
-                                inputStyle={
-                                    'marginRight': '6px'
+                                    'marginRight': '20px'
+                                }
+                            ),
+                            html.Label(
+                                '二级分类：',
+                                style={
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '14px',
+                                    'color': '#2C3E50',
+                                    'marginRight': '8px'
+                                }
+                            ),
+                            dcc.Dropdown(
+                                id='secondary-category-dropdown',
+                                options=[{'label': '全部', 'value': 'all'}],
+                                value='all',
+                                clearable=False,
+                                disabled=True,
+                                style={
+                                    'width': '180px',
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '14px'
                                 }
                             )
                         ],
@@ -1090,7 +1121,8 @@ app.layout = html.Div([
                             'margin': '20px 0 0 0',
                             'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
                             'display': 'flex',
-                            'alignItems': 'center'
+                            'alignItems': 'center',
+                            'flexWrap': 'wrap'
                         }
                     ),
 
@@ -1517,7 +1549,8 @@ def _get_ranking_button_styles(ranking_mode):
      Output('ranking-mode-growth', 'style'),
      Output('ranking-mode-label', 'children')],
     [Input('time-period-dropdown', 'value'),
-     Input('category-radio', 'value'),
+     Input('primary-category-dropdown', 'value'),
+     Input('secondary-category-dropdown', 'value'),
      Input('refresh-button', 'n_clicks'),
      Input('auto-refresh-interval', 'n_intervals'),
      Input('start-date-picker', 'date'),
@@ -1526,7 +1559,7 @@ def _get_ranking_button_styles(ranking_mode):
     [State('refresh-trigger', 'data'),
      State('selected-video-store', 'data')]
 )
-def update_dashboard(selected_period, selected_category, refresh_clicks, auto_intervals, start_date, end_date, ranking_mode, refresh_trigger, selected_video):
+def update_dashboard(selected_period, primary_category, secondary_category, refresh_clicks, auto_intervals, start_date, end_date, ranking_mode, refresh_trigger, selected_video):
     ctx = dash.callback_context
     triggered = ctx.triggered[0]['prop_id'].split('.')[0]
 
@@ -1607,7 +1640,7 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
         raw_data = data_timer.get_data_by_custom_range(start_date, end_date)
     else:
         raw_data = data_timer.get_data_by_period(selected_period)
-    data = filter_data_by_category(raw_data, selected_category)
+    data = filter_data_by_category(raw_data, primary_category, secondary_category)
 
     total_likes = f'{sum(data["likes"]):,}'
     total_comments = f'{sum(data["comments"]):,}'
@@ -1621,7 +1654,7 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
         custom_trend = data_timer.get_custom_trend_data(start_date, end_date)
         trend_figure = create_trend_chart_figure(trend_data=custom_trend)
     else:
-        filtered_all_periods = filter_all_periods_by_category(data_timer.get_all_periods_data(), selected_category)
+        filtered_all_periods = filter_all_periods_by_category(data_timer.get_all_periods_data(), primary_category, secondary_category)
         trend_figure = create_trend_chart_figure(filtered_all_periods)
 
     table_data = create_table_data(data)
@@ -1630,11 +1663,12 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
     custom_end = end_date if selected_period == 'custom' else None
     growth_info = data_timer.get_growth_data(selected_period, custom_start, custom_end)
     raw_changes = growth_info['changes']
-    if selected_category != 'all':
-        from mock_data import VIDEO_CATEGORIES
-        changes_data = [c for c in raw_changes if VIDEO_CATEGORIES.get(c['video']) == selected_category]
+    if primary_category != 'all':
+        changes_data = [c for c in raw_changes if VIDEO_CATEGORIES.get(c['video']) == primary_category]
     else:
         changes_data = raw_changes
+    if secondary_category != 'all':
+        changes_data = [c for c in changes_data if VIDEO_SECONDARY_CATEGORIES.get(c['video']) == secondary_category]
     ranking_panel = create_ranking_panel(data, ranking_mode=ranking_mode, changes_data=changes_data)
 
     if selected_video is not None:
@@ -1651,7 +1685,7 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
 
     custom_start = start_date if selected_period == 'custom' else None
     custom_end = end_date if selected_period == 'custom' else None
-    change_indicators = create_change_indicators(selected_period, selected_category, custom_start, custom_end)
+    change_indicators = create_change_indicators(selected_period, primary_category, secondary_category, custom_start, custom_end)
 
     total_changes = data_timer.calculate_total_changes(selected_period, custom_start, custom_end)
     likes_change_ind = create_stat_change_indicator(total_changes['likes_change'])
@@ -1674,11 +1708,12 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
     Output('download-csv', 'data'),
     [Input('export-button', 'n_clicks')],
     [State('time-period-dropdown', 'value'),
-     State('category-radio', 'value'),
+     State('primary-category-dropdown', 'value'),
+     State('secondary-category-dropdown', 'value'),
      State('start-date-picker', 'date'),
      State('end-date-picker', 'date')]
 )
-def export_csv(n_clicks, selected_period, selected_category, start_date, end_date):
+def export_csv(n_clicks, selected_period, primary_category, secondary_category, start_date, end_date):
     if n_clicks is None or n_clicks == 0:
         return no_update
 
@@ -1693,8 +1728,12 @@ def export_csv(n_clicks, selected_period, selected_category, start_date, end_dat
             'month': '本月'
         }
         period_label = period_labels.get(selected_period, '数据')
-    data = filter_data_by_category(raw_data, selected_category)
-    category_label = f'_{selected_category}' if selected_category != 'all' else ''
+    data = filter_data_by_category(raw_data, primary_category, secondary_category)
+    category_label = ''
+    if primary_category != 'all':
+        category_label += f'_{primary_category}'
+    if secondary_category != 'all':
+        category_label += f'_{secondary_category}'
 
     return export_data_to_csv(data, f'{period_label}{category_label}')
 
@@ -1748,17 +1787,18 @@ def handle_pie_click(click_data, current_scroll_trigger):
     Output('video-detail-card', 'children', allow_duplicate=True),
     [Input('selected-video-store', 'data')],
     [State('time-period-dropdown', 'value'),
-     State('category-radio', 'value'),
+     State('primary-category-dropdown', 'value'),
+     State('secondary-category-dropdown', 'value'),
      State('start-date-picker', 'date'),
      State('end-date-picker', 'date')],
     prevent_initial_call=True
 )
-def update_video_detail_from_store(selected_video, selected_period, selected_category, start_date, end_date):
+def update_video_detail_from_store(selected_video, selected_period, primary_category, secondary_category, start_date, end_date):
     if selected_period == 'custom' and start_date and end_date:
         raw_data = data_timer.get_data_by_custom_range(start_date, end_date)
     else:
         raw_data = data_timer.get_data_by_period(selected_period)
-    data = filter_data_by_category(raw_data, selected_category)
+    data = filter_data_by_category(raw_data, primary_category, secondary_category)
     return create_video_detail_card(selected_video, data)
 
 
@@ -1805,6 +1845,20 @@ app.clientside_callback(
     [Input('scroll-trigger', 'data')],
     prevent_initial_call=True
 )
+
+
+@app.callback(
+    [Output('secondary-category-dropdown', 'options'),
+     Output('secondary-category-dropdown', 'value'),
+     Output('secondary-category-dropdown', 'disabled')],
+    [Input('primary-category-dropdown', 'value')]
+)
+def update_secondary_category_options(primary_category):
+    if primary_category == 'all' or primary_category is None:
+        return [{'label': '全部', 'value': 'all'}], 'all', True
+    secondary_cats = get_secondary_categories(primary_category)
+    options = [{'label': '全部', 'value': 'all'}] + [{'label': cat, 'value': cat} for cat in secondary_cats]
+    return options, 'all', False
 
 
 if __name__ == '__main__':

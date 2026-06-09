@@ -14,13 +14,32 @@ VIDEO_CATEGORIES = {
     '视频 8': '科技'
 }
 
+VIDEO_SECONDARY_CATEGORIES = {
+    '视频 1': '电影',
+    '视频 2': '音乐',
+    '视频 3': '在线课程',
+    '视频 4': '知识科普',
+    '视频 5': '美食',
+    '视频 6': '旅行',
+    '视频 7': '数码产品',
+    '视频 8': '人工智能'
+}
+
 CATEGORIES = ['娱乐', '教育', '生活', '科技']
+
+CATEGORY_HIERARCHY = {
+    '娱乐': ['电影', '音乐'],
+    '教育': ['在线课程', '知识科普'],
+    '生活': ['美食', '旅行'],
+    '科技': ['数码产品', '人工智能']
+}
 
 TIME_PERIOD_DATA = {
     'today': {
         'label': '今日',
         'videos': VIDEO_NAMES,
         'categories': [VIDEO_CATEGORIES[v] for v in VIDEO_NAMES],
+        'secondary_categories': [VIDEO_SECONDARY_CATEGORIES[v] for v in VIDEO_NAMES],
         'likes': [156, 238, 128, 285, 198, 98, 165, 245],
         'comments': [42, 76, 28, 82, 56, 22, 48, 68],
         'shares': [25, 38, 16, 52, 32, 12, 28, 45]
@@ -29,6 +48,7 @@ TIME_PERIOD_DATA = {
         'label': '本周',
         'videos': VIDEO_NAMES,
         'categories': [VIDEO_CATEGORIES[v] for v in VIDEO_NAMES],
+        'secondary_categories': [VIDEO_SECONDARY_CATEGORIES[v] for v in VIDEO_NAMES],
         'likes': [980, 1450, 760, 1680, 1320, 680, 1120, 1580],
         'comments': [265, 450, 168, 520, 340, 142, 310, 418],
         'shares': [148, 228, 95, 298, 198, 72, 168, 268]
@@ -37,6 +57,7 @@ TIME_PERIOD_DATA = {
         'label': '本月',
         'videos': VIDEO_NAMES,
         'categories': [VIDEO_CATEGORIES[v] for v in VIDEO_NAMES],
+        'secondary_categories': [VIDEO_SECONDARY_CATEGORIES[v] for v in VIDEO_NAMES],
         'likes': [4200, 6580, 3250, 7680, 5920, 3120, 4980, 6850],
         'comments': [1120, 2050, 720, 2380, 1520, 630, 1380, 1850],
         'shares': [620, 1020, 420, 1350, 880, 330, 740, 1180]
@@ -97,6 +118,7 @@ def get_data_by_date_range(start_date, end_date):
         'label': f'{start_str} 至 {end_str}',
         'videos': VIDEO_NAMES,
         'categories': [VIDEO_CATEGORIES[v] for v in VIDEO_NAMES],
+        'secondary_categories': [VIDEO_SECONDARY_CATEGORIES[v] for v in VIDEO_NAMES],
         'likes': total_likes,
         'comments': total_comments,
         'shares': total_shares,
