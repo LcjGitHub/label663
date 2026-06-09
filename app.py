@@ -11,6 +11,7 @@ from utils import (
 from export_utils import export_data_to_csv, export_data_to_excel
 from category_utils import filter_data_by_category, get_category_summary_rows, get_category_bar_traces, filter_all_periods_by_category, get_secondary_categories
 from data_timer import data_timer
+from config import APP_PORT, DEBUG_MODE, AUTO_REFRESH_INTERVAL, REFRESH_RATE_LIMIT, APP_HOST, get_config_summary
 
 app = dash.Dash(__name__)
 app.title = "内容互动分析"
@@ -672,7 +673,7 @@ app.layout = html.Div([
     dcc.Store(id='ranking-mode-store', data='absolute'),
     dcc.Interval(
         id='auto-refresh-interval',
-        interval=30 * 1000,
+        interval=AUTO_REFRESH_INTERVAL * 1000,
         n_intervals=0,
         disabled=True
     ),
@@ -1861,6 +1862,14 @@ def update_secondary_category_options(primary_category):
 
 
 if __name__ == '__main__':
+    print("=" * 50)
     print("启动内容互动分析页面...")
-    print("访问地址：http://127.0.0.1:8050")
-    app.run(debug=True, host='127.0.0.1', port=8050)
+    print("-" * 50)
+    print("当前运行配置：")
+    config_summary = get_config_summary()
+    for key, value in config_summary.items():
+        print(f"  {key}: {value}")
+    print("-" * 50)
+    print(f"访问地址：http://{APP_HOST}:{APP_PORT}")
+    print("=" * 50)
+    app.run(debug=DEBUG_MODE, host=APP_HOST, port=APP_PORT)
