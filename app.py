@@ -3,7 +3,7 @@ from dash import html, dcc, dash_table, Input, Output, State, no_update
 import plotly.graph_objects as go
 import numpy as np
 from mock_data import get_data_by_period, TIME_PERIOD_DATA, CATEGORIES, VIDEO_CATEGORIES, VIDEO_SECONDARY_CATEGORIES
-from utils import calculate_rankings, format_ranking_items, get_aggregated_trend_data, format_number, calculate_growth_rates, calculate_growth_rankings
+from utils import calculate_rankings, format_ranking_items, get_aggregated_trend_data, format_number, calculate_growth_rates, calculate_growth_rankings, format_trend
 from export_utils import export_data_to_csv, export_data_to_excel
 from category_utils import filter_data_by_category, get_category_summary_rows, get_category_bar_traces, filter_all_periods_by_category, get_secondary_categories
 from data_timer import data_timer
@@ -667,7 +667,7 @@ def create_change_indicators(period, primary_category='all', secondary_category=
     ])
 
 
-def create_stat_change_indicator(value):
+def create_stat_change_indicator(value, trend=None):
     direction = data_timer.get_change_direction(value)
     if direction == 'up':
         icon = '↑'
@@ -679,7 +679,9 @@ def create_stat_change_indicator(value):
         icon = '→'
         color = '#7F8C8D'
 
-    return html.Div([
+    trend_info = format_trend(trend) if trend else None
+
+    children = [
         html.Span(icon, style={
             'fontSize': '16px',
             'fontWeight': 'bold',
@@ -692,7 +694,22 @@ def create_stat_change_indicator(value):
             'color': color,
             'fontFamily': 'Microsoft YaHei'
         })
-    ])
+    ]
+
+    if trend_info:
+        children.insert(0, html.Span(trend_info['icon'], style={
+            'fontSize': '12px',
+            'fontWeight': 'bold',
+            'color': trend_info['color'],
+            'marginRight': '6px',
+            'title': trend_info['label']
+        }))
+
+    return html.Div(children, style={
+        'display': 'flex',
+        'alignItems': 'center',
+        'justifyContent': 'center'
+    })
 
 
 initial_data = data_timer.get_data_by_period('today')
@@ -1712,10 +1729,11 @@ def update_dashboard(selected_period, primary_category, secondary_category, refr
     change_indicators = create_change_indicators(selected_period, primary_category, secondary_category, custom_start, custom_end)
 
     total_changes = data_timer.calculate_total_changes(selected_period, custom_start, custom_end)
-    likes_change_ind = create_stat_change_indicator(total_changes['likes_change'])
-    comments_change_ind = create_stat_change_indicator(total_changes['comments_change'])
-    shares_change_ind = create_stat_change_indicator(total_changes['shares_change'])
-    interactions_change_ind = create_stat_change_indicator(total_changes['total_change'])
+    trends = data_timer.get_total_trends(selected_period, custom_start, custom_end)
+    likes_change_ind = create_stat_change_indicator(total_changes['likes_change'], trends['likes'])
+    comments_change_ind = create_stat_change_indicator(total_changes['comments_change'], trends['comments'])
+    shares_change_ind = create_stat_change_indicator(total_changes['shares_change'], trends['shares'])
+    interactions_change_ind = create_stat_change_indicator(total_changes['total_change'], trends['total'])
 
     period_labels = {'today': '今日', 'week': '本周', 'month': '本月', 'custom': '自定义'}
     period_label = period_labels.get(selected_period, selected_period)

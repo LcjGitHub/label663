@@ -13,6 +13,13 @@ class DataTimer:
         self.refresh_interval = 30
         self.custom_range_cache = {}
         self.custom_range_previous_cache = {}
+        self.change_history = {
+            'likes': [],
+            'comments': [],
+            'shares': [],
+            'total': []
+        }
+        self.max_history_size = 5
 
     def _simulate_data_change(self, data):
         for period in data:
@@ -47,6 +54,27 @@ class DataTimer:
         for key in self.custom_range_cache:
             self.custom_range_cache[key] = self._simulate_custom_range_change(self.custom_range_cache[key])
         self.last_update_time = datetime.now()
+        self._record_total_changes()
+
+    def _record_total_changes(self):
+        today_current = self.current_data.get('today', {})
+        today_previous = self.previous_data.get('today', {})
+        if today_current and today_previous:
+            likes_change = sum(today_current.get('likes', [])) - sum(today_previous.get('likes', []))
+            comments_change = sum(today_current.get('comments', [])) - sum(today_previous.get('comments', []))
+            shares_change = sum(today_current.get('shares', [])) - sum(today_previous.get('shares', []))
+            total_change = likes_change + comments_change + shares_change
+            self._append_to_history('likes', likes_change)
+            self._append_to_history('comments', comments_change)
+            self._append_to_history('shares', shares_change)
+            self._append_to_history('total', total_change)
+
+    def _append_to_history(self, metric, value):
+        history = self.change_history.get(metric, [])
+        history.append(value)
+        if len(history) > self.max_history_size:
+            history = history[-self.max_history_size:]
+        self.change_history[metric] = history
 
     def get_data_by_period(self, period):
         return self.current_data.get(period, self.current_data['today'])
@@ -151,6 +179,44 @@ class DataTimer:
             return 'down'
         else:
             return 'unchanged'
+
+    def get_trend(self, metric):
+        history = self.change_history.get(metric, [])
+        if len(history) < 2:
+            return 'stable'
+        recent = history[-3:] if len(history) >= 3 else history
+        positive_count = sum(1 for v in recent if v > 0)
+        negative_count = sum(1 for v in recent if v < 0)
+        if positive_count == len(recent):
+            return 'up'
+        elif negative_count == len(recent):
+            return 'down'
+        else:
+            return 'fluctuating'
+
+    def get_total_trends(self, period, start_date=None, end_date=None):
+        if period == 'today':
+            return {
+                'likes': self.get_trend('likes'),
+                'comments': self.get_trend('comments'),
+                'shares': self.get_trend('shares'),
+                'total': self.get_trend('total')
+            }
+        else:
+            total_changes = self.calculate_total_changes(period, start_date, end_date)
+            def single_trend(value):
+                if value > 0:
+                    return 'up'
+                elif value < 0:
+                    return 'down'
+                else:
+                    return 'stable'
+            return {
+                'likes': single_trend(total_changes['likes_change']),
+                'comments': single_trend(total_changes['comments_change']),
+                'shares': single_trend(total_changes['shares_change']),
+                'total': single_trend(total_changes['total_change'])
+            }
 
 
 data_timer = DataTimer()

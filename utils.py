@@ -169,3 +169,30 @@ def get_aggregated_trend_data(all_periods_data):
 
 def format_number(num):
     return f'{num:,}'
+
+
+def format_trend(trend):
+    if trend == 'up':
+        return {
+            'icon': '↑↑',
+            'color': '#27AE60',
+            'label': '连续增长'
+        }
+    elif trend == 'down':
+        return {
+            'icon': '↓↓',
+            'color': '#E74C3C',
+            'label': '连续下降'
+        }
+    elif trend == 'fluctuating':
+        return {
+            'icon': '↗↘',
+            'color': '#F39C12',
+            'label': '波动'
+        }
+    else:
+        return {
+            'icon': '→',
+            'color': '#7F8C8D',
+            'label': '稳定'
+        }
