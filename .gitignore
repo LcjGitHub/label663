@@ -121,3 +121,10 @@ tmp/
 *.tar.gz
 *.tgz
 *.rar
+
+# Spreadsheets
+*.xlsx
+*.xls
+*.xlsm
+*.xlsb
+
