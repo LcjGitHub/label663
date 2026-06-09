@@ -2,10 +2,10 @@ import dash
 from dash import html, dcc, dash_table, Input, Output, State, no_update
 import plotly.graph_objects as go
 import numpy as np
-from mock_data import get_data_by_period, TIME_PERIOD_DATA, CATEGORY_LIST
+from mock_data import get_data_by_period, TIME_PERIOD_DATA, CATEGORIES
 from utils import calculate_rankings, format_ranking_items, get_aggregated_trend_data, format_number
 from export_utils import export_data_to_csv
-from category_utils import filter_data_by_category, get_category_comparison_data, get_category_summary
+from category_utils import filter_data_by_category, get_category_summary_rows, get_category_bar_traces, filter_all_periods_by_category
 
 app = dash.Dash(__name__)
 app.title = "内容互动分析"
@@ -90,6 +90,7 @@ def create_chart_figure(data):
 
 def create_table_data(data):
     videos = data['videos']
+    categories = data.get('categories', [])
     likes = data['likes']
     comments = data['comments']
     shares = data['shares']
@@ -99,6 +100,7 @@ def create_table_data(data):
         total = likes[i] + comments[i] + shares[i]
         table_rows.append({
             'video_name': videos[i],
+            'category': categories[i] if i < len(categories) else '-',
             'likes': f'{likes[i]:,}',
             'comments': f'{comments[i]:,}',
             'shares': f'{shares[i]:,}',
@@ -107,8 +109,10 @@ def create_table_data(data):
     return table_rows
 
 
-def create_trend_chart_figure():
-    trend_info = get_aggregated_trend_data(TIME_PERIOD_DATA)
+def create_trend_chart_figure(all_periods_data=None):
+    if all_periods_data is None:
+        all_periods_data = TIME_PERIOD_DATA
+    trend_info = get_aggregated_trend_data(all_periods_data)
     periods = trend_info['periods']
     total_likes = trend_info['total_likes']
     total_comments = trend_info['total_comments']
@@ -233,6 +237,83 @@ def create_pie_chart_figure(data):
         font={'family': 'Microsoft YaHei'},
         margin={'t': 60, 'l': 40, 'r': 40, 'b': 80},
         height=500
+    )
+
+    return fig
+
+
+def create_category_bar_chart_figure(data):
+    categories, avg_likes, avg_comments, avg_shares = get_category_bar_traces(data)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        y=categories,
+        x=avg_likes,
+        name='平均点赞',
+        orientation='h',
+        marker_color='#FF6B6B',
+        hovertemplate='<b>%{y}</b><br>平均点赞： %{x:,}<extra></extra>'
+    ))
+
+    fig.add_trace(go.Bar(
+        y=categories,
+        x=avg_comments,
+        name='平均评论',
+        orientation='h',
+        marker_color='#4ECDC4',
+        hovertemplate='<b>%{y}</b><br>平均评论： %{x:,}<extra></extra>'
+    ))
+
+    fig.add_trace(go.Bar(
+        y=categories,
+        x=avg_shares,
+        name='平均分享',
+        orientation='h',
+        marker_color='#FFE66D',
+        hovertemplate='<b>%{y}</b><br>平均分享： %{x:,}<extra></extra>'
+    ))
+
+    fig.update_layout(
+        title={
+            'text': '视频分类平均互动数据对比',
+            'font': {'size': 20, 'family': 'Microsoft YaHei', 'color': '#2C3E50'},
+            'y': 0.95,
+            'x': 0.5
+        },
+        xaxis_title={
+            'text': '平均互动数量',
+            'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
+        },
+        yaxis_title={
+            'text': '视频分类',
+            'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
+        },
+        barmode='group',
+        hovermode='y unified',
+        showlegend=True,
+        legend={
+            'orientation': 'h',
+            'y': 1.02,
+            'x': 0.5,
+            'xanchor': 'center',
+            'font': {'size': 12, 'family': 'Microsoft YaHei'}
+        },
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font={'family': 'Microsoft YaHei'},
+        margin={'t': 80, 'l': 80, 'r': 40, 'b': 60},
+        height=450
+    )
+
+    fig.update_xaxes(
+        tickfont={'family': 'Microsoft YaHei', 'size': 12, 'color': '#34495E'},
+        gridcolor='rgba(0,0,0,0.1)'
+    )
+
+    fig.update_yaxes(
+        tickfont={'family': 'Microsoft YaHei', 'size': 12, 'color': '#34495E'},
+        gridcolor='rgba(0,0,0,0.1)'
     )
 
     return fig
@@ -491,222 +572,6 @@ def create_ranking_panel(data):
     ])
 
 
-def create_category_bar_chart(data):
-    comparison_data = get_category_comparison_data(data)
-    categories = comparison_data['categories']
-    avg_likes = comparison_data['avg_likes']
-    avg_comments = comparison_data['avg_comments']
-    avg_shares = comparison_data['avg_shares']
-
-    fig = go.Figure()
-
-    fig.add_trace(go.Bar(
-        y=categories,
-        x=avg_likes,
-        name='平均点赞',
-        orientation='h',
-        marker_color='#FF6B6B',
-        hovertemplate='<b>%{y}</b><br>平均点赞：%{x:,.2f}<extra></extra>'
-    ))
-
-    fig.add_trace(go.Bar(
-        y=categories,
-        x=avg_comments,
-        name='平均评论',
-        orientation='h',
-        marker_color='#4ECDC4',
-        hovertemplate='<b>%{y}</b><br>平均评论：%{x:,.2f}<extra></extra>'
-    ))
-
-    fig.add_trace(go.Bar(
-        y=categories,
-        x=avg_shares,
-        name='平均分享',
-        orientation='h',
-        marker_color='#FFE66D',
-        hovertemplate='<b>%{y}</b><br>平均分享：%{x:,.2f}<extra></extra>'
-    ))
-
-    fig.update_layout(
-        title={
-            'text': '各分类平均互动数据对比',
-            'font': {'size': 20, 'family': 'Microsoft YaHei', 'color': '#2C3E50'},
-            'y': 0.95,
-            'x': 0.5
-        },
-        xaxis_title={
-            'text': '平均互动数量',
-            'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
-        },
-        yaxis_title={
-            'text': '视频分类',
-            'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
-        },
-        barmode='group',
-        hovermode='closest',
-        showlegend=True,
-        legend={
-            'orientation': 'h',
-            'y': 1.02,
-            'x': 0.5,
-            'xanchor': 'center',
-            'font': {'size': 12, 'family': 'Microsoft YaHei'}
-        },
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font={'family': 'Microsoft YaHei'},
-        margin={'t': 80, 'l': 80, 'r': 40, 'b': 60},
-        height=500
-    )
-
-    fig.update_xaxes(
-        tickfont={'family': 'Microsoft YaHei', 'size': 12, 'color': '#34495E'},
-        gridcolor='rgba(0,0,0,0.1)'
-    )
-
-    fig.update_yaxes(
-        tickfont={'family': 'Microsoft YaHei', 'size': 12, 'color': '#34495E'},
-        gridcolor='rgba(0,0,0,0.1)'
-    )
-
-    return fig
-
-
-def create_category_summary_panel(data):
-    summary = get_category_summary(data)
-    category_colors = {
-        '娱乐': '#FF6B6B',
-        '教育': '#4ECDC4',
-        '生活': '#FFE66D',
-        '科技': '#3498DB'
-    }
-    category_icons = {
-        '娱乐': '🎬',
-        '教育': '📚',
-        '生活': '🏠',
-        '科技': '💻'
-    }
-
-    summary_cards = []
-    for category, stats in summary.items():
-        color = category_colors.get(category, '#9B59B6')
-        icon = category_icons.get(category, '📊')
-        summary_cards.append(
-            html.Div([
-                html.Div([
-                    html.Span(icon, style={'fontSize': '24px', 'marginRight': '8px'}),
-                    html.Span(category, style={
-                        'fontFamily': 'Microsoft YaHei',
-                        'fontSize': '18px',
-                        'fontWeight': 'bold',
-                        'color': '#2C3E50'
-                    })
-                ], style={
-                    'display': 'flex',
-                    'alignItems': 'center',
-                    'marginBottom': '15px',
-                    'paddingBottom': '10px',
-                    'borderBottom': '3px solid ' + color
-                }),
-                html.Div([
-                    html.Div([
-                        html.Div('视频数量', style={'color': '#7F8C8D', 'fontSize': '12px', 'marginBottom': '5px'}),
-                        html.Div(f'{stats["count"]}', style={
-                            'color': color,
-                            'fontSize': '22px',
-                            'fontWeight': 'bold'
-                        })
-                    ], style={
-                        'textAlign': 'center',
-                        'flex': '1',
-                        'padding': '10px',
-                        'backgroundColor': '#F8F9FA',
-                        'borderRadius': '6px',
-                        'margin': '0 4px'
-                    }),
-                    html.Div([
-                        html.Div('平均点赞', style={'color': '#7F8C8D', 'fontSize': '12px', 'marginBottom': '5px'}),
-                        html.Div(f'{stats["avg_likes"]:,.2f}', style={
-                            'color': color,
-                            'fontSize': '22px',
-                            'fontWeight': 'bold'
-                        })
-                    ], style={
-                        'textAlign': 'center',
-                        'flex': '1',
-                        'padding': '10px',
-                        'backgroundColor': '#F8F9FA',
-                        'borderRadius': '6px',
-                        'margin': '0 4px'
-                    })
-                ], style={'display': 'flex', 'marginBottom': '10px'}),
-                html.Div([
-                    html.Div([
-                        html.Div('平均评论', style={'color': '#7F8C8D', 'fontSize': '12px', 'marginBottom': '5px'}),
-                        html.Div(f'{stats["avg_comments"]:,.2f}', style={
-                            'color': color,
-                            'fontSize': '22px',
-                            'fontWeight': 'bold'
-                        })
-                    ], style={
-                        'textAlign': 'center',
-                        'flex': '1',
-                        'padding': '10px',
-                        'backgroundColor': '#F8F9FA',
-                        'borderRadius': '6px',
-                        'margin': '0 4px'
-                    }),
-                    html.Div([
-                        html.Div('平均分享', style={'color': '#7F8C8D', 'fontSize': '12px', 'marginBottom': '5px'}),
-                        html.Div(f'{stats["avg_shares"]:,.2f}', style={
-                            'color': color,
-                            'fontSize': '22px',
-                            'fontWeight': 'bold'
-                        })
-                    ], style={
-                        'textAlign': 'center',
-                        'flex': '1',
-                        'padding': '10px',
-                        'backgroundColor': '#F8F9FA',
-                        'borderRadius': '6px',
-                        'margin': '0 4px'
-                    })
-                ], style={'display': 'flex'})
-            ], style={
-                'backgroundColor': '#FFFFFF',
-                'borderRadius': '10px',
-                'padding': '20px',
-                'flex': '1 1 250px',
-                'minWidth': '0',
-                'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
-            })
-        )
-
-    return html.Div([
-        html.Div(
-            '📊 分类数据摘要',
-            style={
-                'fontFamily': 'Microsoft YaHei',
-                'fontSize': '18px',
-                'fontWeight': 'bold',
-                'color': '#2C3E50',
-                'textAlign': 'center',
-                'marginBottom': '20px',
-                'paddingBottom': '15px',
-                'borderBottom': '2px solid #E8E8E8'
-            }
-        ),
-        html.Div(
-            summary_cards,
-            style={
-                'display': 'flex',
-                'flexWrap': 'wrap',
-                'gap': '15px'
-            }
-        )
-    ])
-
-
 initial_data = get_data_by_period('today')
 initial_fig = create_chart_figure(initial_data)
 initial_pie_fig = create_pie_chart_figure(initial_data)
@@ -714,8 +579,8 @@ initial_trend_fig = create_trend_chart_figure()
 initial_table_data = create_table_data(initial_data)
 initial_ranking_panel = create_ranking_panel(initial_data)
 initial_video_detail = create_video_detail_card(None, initial_data)
-initial_category_bar_fig = create_category_bar_chart(initial_data)
-initial_category_summary = create_category_summary_panel(initial_data)
+initial_category_bar_fig = create_category_bar_chart_figure(initial_data)
+initial_category_summary = get_category_summary_rows(initial_data)
 
 app.layout = html.Div([
     dcc.Download(id='download-csv'),
@@ -836,54 +701,6 @@ app.layout = html.Div([
     ),
 
     html.Div(
-        className='category-filter-container',
-        children=[
-            html.Label(
-                '视频分类筛选：',
-                style={
-                    'fontFamily': 'Microsoft YaHei',
-                    'fontSize': '14px',
-                    'color': '#2C3E50',
-                    'marginRight': '20px',
-                    'fontWeight': 'bold'
-                }
-            ),
-            dcc.RadioItems(
-                id='category-radio',
-                options=[{'label': cat, 'value': cat} for cat in CATEGORY_LIST],
-                value='全部',
-                labelStyle={
-                    'display': 'inline-block',
-                    'marginRight': '20px',
-                    'fontFamily': 'Microsoft YaHei',
-                    'fontSize': '14px',
-                    'color': '#34495E',
-                    'cursor': 'pointer'
-                },
-                inputStyle={
-                    'marginRight': '6px',
-                    'cursor': 'pointer'
-                },
-                style={
-                    'display': 'inline-flex',
-                    'flexWrap': 'wrap',
-                    'alignItems': 'center'
-                }
-            )
-        ],
-        style={
-            'backgroundColor': '#FFFFFF',
-            'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
-            'borderRadius': '8px',
-            'margin': '20px 20px 0 20px',
-            'padding': '15px 25px',
-            'display': 'flex',
-            'alignItems': 'center',
-            'justifyContent': 'center'
-        }
-    ),
-
-    html.Div(
         className='main-content',
         children=[
             html.Div(
@@ -979,6 +796,48 @@ app.layout = html.Div([
                         }
                     ),
 
+                    html.Div(
+                        className='category-filter-container',
+                        children=[
+                            html.Label(
+                                '视频分类筛选：',
+                                style={
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '14px',
+                                    'color': '#2C3E50',
+                                    'marginRight': '15px',
+                                    'fontWeight': 'bold'
+                                }
+                            ),
+                            dcc.RadioItems(
+                                id='category-radio',
+                                options=[
+                                    {'label': '全部', 'value': 'all'}
+                                ] + [{'label': cat, 'value': cat} for cat in CATEGORIES],
+                                value='all',
+                                labelStyle={
+                                    'display': 'inline-block',
+                                    'marginRight': '20px',
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '14px',
+                                    'color': '#34495E'
+                                },
+                                inputStyle={
+                                    'marginRight': '6px'
+                                }
+                            )
+                        ],
+                        style={
+                            'backgroundColor': '#FFFFFF',
+                            'borderRadius': '8px',
+                            'padding': '15px 25px',
+                            'margin': '20px 0 0 0',
+                            'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
+                            'display': 'flex',
+                            'alignItems': 'center'
+                        }
+                    ),
+
                     html.Div([
                         html.Div(
                             className='chart-container',
@@ -1042,12 +901,12 @@ app.layout = html.Div([
                     ),
 
                     html.Div(
-                        className='category-bar-chart-container',
+                        className='category-bar-container',
                         children=[
                             dcc.Graph(
                                 id='category-bar-chart',
                                 figure=initial_category_bar_fig,
-                                style={'height': '500px'}
+                                style={'height': '450px'}
                             )
                         ],
                         style={
@@ -1075,6 +934,7 @@ app.layout = html.Div([
                                 id='video-data-table',
                                 columns=[
                                     {'name': '视频名称', 'id': 'video_name'},
+                                    {'name': '视频分类', 'id': 'category'},
                                     {'name': '点赞数', 'id': 'likes'},
                                     {'name': '评论数', 'id': 'comments'},
                                     {'name': '分享数', 'id': 'shares'},
@@ -1178,14 +1038,58 @@ app.layout = html.Div([
 
     html.Div(
         className='category-summary-container',
-        id='category-summary-container',
         children=[
-            initial_category_summary
+            html.H3(
+                '📊 视频分类数据摘要',
+                style={
+                    'fontFamily': 'Microsoft YaHei',
+                    'color': '#2C3E50',
+                    'margin': '0 0 15px 0',
+                    'fontSize': '18px'
+                }
+            ),
+            dash_table.DataTable(
+                id='category-summary-table',
+                columns=[
+                    {'name': '视频分类', 'id': 'category'},
+                    {'name': '视频数量', 'id': 'video_count'},
+                    {'name': '平均点赞', 'id': 'avg_likes'},
+                    {'name': '平均评论', 'id': 'avg_comments'},
+                    {'name': '平均分享', 'id': 'avg_shares'}
+                ],
+                data=initial_category_summary,
+                style_header={
+                    'backgroundColor': '#34495E',
+                    'color': '#FFFFFF',
+                    'fontWeight': 'bold',
+                    'fontFamily': 'Microsoft YaHei',
+                    'fontSize': '14px',
+                    'textAlign': 'center',
+                    'padding': '12px'
+                },
+                style_cell={
+                    'fontFamily': 'Microsoft YaHei',
+                    'fontSize': '13px',
+                    'textAlign': 'center',
+                    'padding': '10px',
+                    'backgroundColor': '#FFFFFF'
+                },
+                style_data_conditional=[
+                    {
+                        'if': {'row_index': 'odd'},
+                        'backgroundColor': '#F8F9FA'
+                    }
+                ],
+                style_table={
+                    'borderRadius': '8px',
+                    'overflow': 'hidden'
+                }
+            )
         ],
         style={
             'backgroundColor': '#FFFFFF',
             'borderRadius': '8px',
-            'padding': '25px',
+            'padding': '20px',
             'margin': '20px 20px 0 20px',
             'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
         }
@@ -1219,18 +1123,19 @@ app.layout = html.Div([
      Output('total-interactions', 'children'),
      Output('stacked-bar-chart', 'figure'),
      Output('pie-chart', 'figure'),
+     Output('trend-line-chart', 'figure'),
      Output('video-data-table', 'data'),
      Output('ranking-sidebar', 'children'),
      Output('video-detail-card', 'children'),
      Output('selected-video-store', 'data'),
      Output('category-bar-chart', 'figure'),
-     Output('category-summary-container', 'children')],
+     Output('category-summary-table', 'data')],
     [Input('time-period-dropdown', 'value'),
      Input('category-radio', 'value')]
 )
 def update_dashboard(selected_period, selected_category):
-    period_data = get_data_by_period(selected_period)
-    data = filter_data_by_category(period_data, selected_category)
+    raw_data = get_data_by_period(selected_period)
+    data = filter_data_by_category(raw_data, selected_category)
 
     total_likes = f'{sum(data["likes"]):,}'
     total_comments = f'{sum(data["comments"]):,}'
@@ -1239,15 +1144,19 @@ def update_dashboard(selected_period, selected_category):
 
     figure = create_chart_figure(data)
     pie_figure = create_pie_chart_figure(data)
+
+    filtered_all_periods = filter_all_periods_by_category(TIME_PERIOD_DATA, selected_category)
+    trend_figure = create_trend_chart_figure(filtered_all_periods)
+
     table_data = create_table_data(data)
     ranking_panel = create_ranking_panel(data)
 
     video_detail = create_video_detail_card(None, data)
 
-    category_bar_fig = create_category_bar_chart(period_data)
-    category_summary = create_category_summary_panel(period_data)
+    category_bar_fig = create_category_bar_chart_figure(data)
+    category_summary = get_category_summary_rows(data)
 
-    return total_likes, total_comments, total_shares, total_interactions, figure, pie_figure, table_data, ranking_panel, video_detail, None, category_bar_fig, category_summary
+    return total_likes, total_comments, total_shares, total_interactions, figure, pie_figure, trend_figure, table_data, ranking_panel, video_detail, None, category_bar_fig, category_summary
 
 
 @app.callback(
@@ -1260,15 +1169,15 @@ def export_csv(n_clicks, selected_period, selected_category):
     if n_clicks is None or n_clicks == 0:
         return no_update
 
-    period_data = get_data_by_period(selected_period)
-    data = filter_data_by_category(period_data, selected_category)
+    raw_data = get_data_by_period(selected_period)
+    data = filter_data_by_category(raw_data, selected_category)
     period_labels = {
         'today': '今日',
         'week': '本周',
         'month': '本月'
     }
     period_label = period_labels.get(selected_period, '数据')
-    category_label = '' if selected_category == '全部' or selected_category is None else f'_{selected_category}'
+    category_label = f'_{selected_category}' if selected_category != 'all' else ''
 
     return export_data_to_csv(data, f'{period_label}{category_label}')
 
@@ -1296,8 +1205,8 @@ def handle_pie_click(click_data, current_scroll_trigger):
     prevent_initial_call=True
 )
 def update_video_detail_from_store(selected_video, selected_period, selected_category):
-    period_data = get_data_by_period(selected_period)
-    data = filter_data_by_category(period_data, selected_category)
+    raw_data = get_data_by_period(selected_period)
+    data = filter_data_by_category(raw_data, selected_category)
     return create_video_detail_card(selected_video, data)
 
 

@@ -1,26 +1,29 @@
+from mock_data import CATEGORIES
+
+
 def filter_data_by_category(data, category):
-    if category == '全部' or category is None:
+    if category == 'all':
         return data
 
     videos = data['videos']
-    categories = data['categories']
+    categories = data.get('categories', [])
     likes = data['likes']
     comments = data['comments']
     shares = data['shares']
 
     filtered_videos = []
-    filtered_categories = []
     filtered_likes = []
     filtered_comments = []
     filtered_shares = []
+    filtered_categories = []
 
     for i in range(len(videos)):
-        if categories[i] == category:
+        if len(categories) > i and categories[i] == category:
             filtered_videos.append(videos[i])
-            filtered_categories.append(categories[i])
             filtered_likes.append(likes[i])
             filtered_comments.append(comments[i])
             filtered_shares.append(shares[i])
+            filtered_categories.append(categories[i])
 
     return {
         'label': data.get('label', ''),
@@ -32,59 +35,84 @@ def filter_data_by_category(data, category):
     }
 
 
-def aggregate_data_by_category(data):
-    categories = data['categories']
+def calculate_category_stats(data):
+    categories_list = data.get('categories', [])
+    videos = data['videos']
     likes = data['likes']
     comments = data['comments']
     shares = data['shares']
 
-    category_stats = {}
-
-    for i in range(len(categories)):
-        cat = categories[i]
-        if cat not in category_stats:
-            category_stats[cat] = {
-                'count': 0,
-                'total_likes': 0,
-                'total_comments': 0,
-                'total_shares': 0
-            }
-        category_stats[cat]['count'] += 1
-        category_stats[cat]['total_likes'] += likes[i]
-        category_stats[cat]['total_comments'] += comments[i]
-        category_stats[cat]['total_shares'] += shares[i]
-
-    result = {}
-    for cat, stats in category_stats.items():
-        count = stats['count']
-        result[cat] = {
-            'count': count,
-            'avg_likes': round(stats['total_likes'] / count, 2) if count > 0 else 0,
-            'avg_comments': round(stats['total_comments'] / count, 2) if count > 0 else 0,
-            'avg_shares': round(stats['total_shares'] / count, 2) if count > 0 else 0,
-            'total_likes': stats['total_likes'],
-            'total_comments': stats['total_comments'],
-            'total_shares': stats['total_shares']
+    category_data = {}
+    for cat in CATEGORIES:
+        category_data[cat] = {
+            'video_count': 0,
+            'total_likes': 0,
+            'total_comments': 0,
+            'total_shares': 0
         }
+
+    for i in range(len(videos)):
+        cat = categories_list[i] if i < len(categories_list) else None
+        if cat and cat in category_data:
+            category_data[cat]['video_count'] += 1
+            category_data[cat]['total_likes'] += likes[i]
+            category_data[cat]['total_comments'] += comments[i]
+            category_data[cat]['total_shares'] += shares[i]
+
+    result = []
+    for cat in CATEGORIES:
+        d = category_data[cat]
+        count = d['video_count']
+        avg_likes = round(d['total_likes'] / count, 2) if count > 0 else 0
+        avg_comments = round(d['total_comments'] / count, 2) if count > 0 else 0
+        avg_shares = round(d['total_shares'] / count, 2) if count > 0 else 0
+        result.append({
+            'category': cat,
+            'video_count': count,
+            'avg_likes': avg_likes,
+            'avg_comments': avg_comments,
+            'avg_shares': avg_shares,
+            'avg_total': round(avg_likes + avg_comments + avg_shares, 2)
+        })
 
     return result
 
 
-def get_category_comparison_data(data):
-    aggregated = aggregate_data_by_category(data)
-    category_names = list(aggregated.keys())
-    avg_likes = [aggregated[cat]['avg_likes'] for cat in category_names]
-    avg_comments = [aggregated[cat]['avg_comments'] for cat in category_names]
-    avg_shares = [aggregated[cat]['avg_shares'] for cat in category_names]
-
-    return {
-        'categories': category_names,
-        'avg_likes': avg_likes,
-        'avg_comments': avg_comments,
-        'avg_shares': avg_shares,
-        'raw_data': aggregated
-    }
+def get_category_summary_rows(data):
+    stats = calculate_category_stats(data)
+    rows = []
+    for s in stats:
+        rows.append({
+            'category': s['category'],
+            'video_count': f'{s["video_count"]} 个',
+            'avg_likes': f'{s["avg_likes"]:,}',
+            'avg_comments': f'{s["avg_comments"]:,}',
+            'avg_shares': f'{s["avg_shares"]:,}'
+        })
+    return rows
 
 
-def get_category_summary(data):
-    return aggregate_data_by_category(data)
+def get_category_bar_data(data, metric='avg_total'):
+    stats = calculate_category_stats(data)
+    categories = [s['category'] for s in stats]
+    values = [s[metric] for s in stats]
+    return categories, values
+
+
+def get_category_bar_traces(data):
+    stats = calculate_category_stats(data)
+    categories = [s['category'] for s in stats]
+    avg_likes = [s['avg_likes'] for s in stats]
+    avg_comments = [s['avg_comments'] for s in stats]
+    avg_shares = [s['avg_shares'] for s in stats]
+    return categories, avg_likes, avg_comments, avg_shares
+
+
+def filter_all_periods_by_category(all_periods_data, category):
+    if category == 'all':
+        return all_periods_data
+
+    filtered_data = {}
+    for period, data in all_periods_data.items():
+        filtered_data[period] = filter_data_by_category(data, category)
+    return filtered_data
