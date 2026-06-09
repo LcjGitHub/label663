@@ -36,7 +36,6 @@ def generate_csv_content(data):
     total_shares = sum(shares)
     grand_total = total_likes + total_comments + total_shares
 
-    writer.writerow([])
     writer.writerow(['合计', '', '', total_likes, total_comments, total_shares, grand_total])
 
     return output.getvalue()
@@ -68,7 +67,7 @@ def export_data_to_csv(data, period_label='今日'):
     return create_download_link(csv_content, f'互动数据_{period_label}', file_type='csv')
 
 
-def generate_excel_content(data, category_summary_data=None, trend_data=None):
+def generate_excel_content(data, category_summary_data=None, trend_data=None, category_bar_data=None):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
@@ -120,7 +119,7 @@ def generate_excel_content(data, category_summary_data=None, trend_data=None):
     total_shares = sum(shares)
     grand_total = total_likes + total_comments + total_shares
 
-    total_row_idx = len(videos) + 3
+    total_row_idx = len(videos) + 2
     total_row_data = ['合计', '', '', total_likes, total_comments, total_shares, grand_total]
     for col_idx, value in enumerate(total_row_data, 1):
         cell = ws_raw.cell(row=total_row_idx, column=col_idx, value=value)
@@ -214,8 +213,54 @@ def generate_excel_content(data, category_summary_data=None, trend_data=None):
             cell.alignment = center_align
             cell.border = thin_border
 
+    current_row = len(videos) + 4
+    ws_chart.cell(row=current_row, column=1, value='饼图数据（各视频互动占比）').font = Font(bold=True, size=14)
+    current_row += 1
+
+    pie_headers = ['视频名称', '总互动数', '占比(%)']
+    for col_idx, header in enumerate(pie_headers, 1):
+        cell = ws_chart.cell(row=current_row, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+        cell.border = thin_border
+    current_row += 1
+
+    for i in range(len(videos)):
+        total = likes[i] + comments[i] + shares[i]
+        percentage = round(total / grand_total * 100, 2) if grand_total > 0 else 0
+        row_data = [videos[i], total, percentage]
+        for col_idx, value in enumerate(row_data, 1):
+            cell = ws_chart.cell(row=current_row, column=col_idx, value=value)
+            cell.alignment = center_align
+            cell.border = thin_border
+        current_row += 1
+
+    if category_bar_data:
+        current_row += 2
+        ws_chart.cell(row=current_row, column=1, value='分类对比柱状图数据').font = Font(bold=True, size=14)
+        current_row += 1
+
+        bar_headers = ['视频分类', '平均点赞', '平均评论', '平均分享']
+        for col_idx, header in enumerate(bar_headers, 1):
+            cell = ws_chart.cell(row=current_row, column=col_idx, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = center_align
+            cell.border = thin_border
+        current_row += 1
+
+        cat_names, cat_avg_likes, cat_avg_comments, cat_avg_shares = category_bar_data
+        for i in range(len(cat_names)):
+            row_data = [cat_names[i], cat_avg_likes[i], cat_avg_comments[i], cat_avg_shares[i]]
+            for col_idx, value in enumerate(row_data, 1):
+                cell = ws_chart.cell(row=current_row, column=col_idx, value=value)
+                cell.alignment = center_align
+                cell.border = thin_border
+            current_row += 1
+
     if trend_data:
-        current_row = len(videos) + 4
+        current_row += 2
         ws_chart.cell(row=current_row, column=1, value='趋势数据').font = Font(bold=True, size=14)
         current_row += 1
 
@@ -242,14 +287,14 @@ def generate_excel_content(data, category_summary_data=None, trend_data=None):
                 cell.border = thin_border
             current_row += 1
 
-    for col_idx in range(1, len(chart_headers) + 1):
-        ws_chart.column_dimensions[get_column_letter(col_idx)].width = 18
+    for col_idx in range(1, 6):
+        ws_chart.column_dimensions[get_column_letter(col_idx)].width = 20
 
     output = io.BytesIO()
     wb.save(output)
     return output.getvalue()
 
 
-def export_data_to_excel(data, period_label='今日', category_summary_data=None, trend_data=None):
-    excel_content = generate_excel_content(data, category_summary_data, trend_data)
+def export_data_to_excel(data, period_label='今日', category_summary_data=None, trend_data=None, category_bar_data=None):
+    excel_content = generate_excel_content(data, category_summary_data, trend_data, category_bar_data)
     return create_download_link(excel_content, f'互动数据_{period_label}', file_type='excel')
