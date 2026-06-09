@@ -24,16 +24,75 @@ def calculate_rankings(data, top_n=3):
     }
 
 
-def format_ranking_items(rankings, metric):
+def format_ranking_items(rankings, metric, is_growth=False):
     items = []
     medals = ['🥇', '🥈', '🥉']
     for idx, item in enumerate(rankings):
+        if is_growth:
+            value = format_growth_rate(item[metric])
+        else:
+            value = f'{item[metric]:,}'
         items.append({
             'medal': medals[idx] if idx < len(medals) else f'{idx + 1}',
             'name': item['name'],
-            'value': f'{item[metric]:,}'
+            'value': value
         })
     return items
+
+
+def calculate_growth_rates(changes_data, current_data):
+    videos = current_data['videos']
+    likes = current_data['likes']
+    comments = current_data['comments']
+    shares = current_data['shares']
+
+    growth_data = []
+    change_map = {c['video']: c for c in changes_data}
+
+    for i in range(len(videos)):
+        video_name = videos[i]
+        change = change_map.get(video_name, {})
+        likes_change = change.get('likes_change', 0)
+        comments_change = change.get('comments_change', 0)
+        shares_change = change.get('shares_change', 0)
+
+        likes_prev = likes[i] - likes_change
+        comments_prev = comments[i] - comments_change
+        shares_prev = shares[i] - shares_change
+
+        likes_rate = (likes_change / likes_prev * 100) if likes_prev > 0 else 0
+        comments_rate = (comments_change / comments_prev * 100) if comments_prev > 0 else 0
+        shares_rate = (shares_change / shares_prev * 100) if shares_prev > 0 else 0
+
+        growth_data.append({
+            'name': video_name,
+            'likes': round(likes_rate, 2),
+            'comments': round(comments_rate, 2),
+            'shares': round(shares_rate, 2)
+        })
+
+    return growth_data
+
+
+def calculate_growth_rankings(growth_data, top_n=3):
+    likes_ranking = sorted(growth_data, key=lambda x: x['likes'], reverse=True)[:top_n]
+    comments_ranking = sorted(growth_data, key=lambda x: x['comments'], reverse=True)[:top_n]
+    shares_ranking = sorted(growth_data, key=lambda x: x['shares'], reverse=True)[:top_n]
+
+    return {
+        'likes': likes_ranking,
+        'comments': comments_ranking,
+        'shares': shares_ranking
+    }
+
+
+def format_growth_rate(rate):
+    if rate > 0:
+        return f'+{rate:.2f}%'
+    elif rate < 0:
+        return f'{rate:.2f}%'
+    else:
+        return '0.00%'
 
 
 def get_trend_data(all_periods_data):

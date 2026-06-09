@@ -103,6 +103,17 @@ class DataTimer:
 
         return changes
 
+    def get_growth_data(self, period, start_date=None, end_date=None):
+        if period == 'custom' and start_date and end_date:
+            current = self.get_data_by_custom_range(start_date, end_date)
+        else:
+            current = self.get_data_by_period(period)
+        changes = self.calculate_changes(period, start_date, end_date)
+        return {
+            'current_data': current,
+            'changes': changes
+        }
+
     def calculate_total_changes(self, period, start_date=None, end_date=None):
         if period == 'custom' and start_date and end_date:
             key = self._get_range_key(start_date, end_date)

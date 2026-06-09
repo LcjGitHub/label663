@@ -3,7 +3,7 @@ from dash import html, dcc, dash_table, Input, Output, State, no_update
 import plotly.graph_objects as go
 import numpy as np
 from mock_data import get_data_by_period, TIME_PERIOD_DATA, CATEGORIES
-from utils import calculate_rankings, format_ranking_items, get_aggregated_trend_data, format_number
+from utils import calculate_rankings, format_ranking_items, get_aggregated_trend_data, format_number, calculate_growth_rates, calculate_growth_rankings
 from export_utils import export_data_to_csv
 from category_utils import filter_data_by_category, get_category_summary_rows, get_category_bar_traces, filter_all_periods_by_category
 from data_timer import data_timer
@@ -504,12 +504,20 @@ def create_video_detail_card(video_name, data):
     })
 
 
-def create_ranking_panel(data):
-    rankings = calculate_rankings(data, top_n=3)
+def create_ranking_panel(data, ranking_mode='absolute', changes_data=None):
+    if ranking_mode == 'growth' and changes_data is not None:
+        growth_data = calculate_growth_rates(changes_data, data)
+        rankings = calculate_growth_rankings(growth_data, top_n=3)
+        is_growth = True
+        title_suffix = '（增长率）'
+    else:
+        rankings = calculate_rankings(data, top_n=3)
+        is_growth = False
+        title_suffix = '（绝对数值）'
 
-    likes_items = format_ranking_items(rankings['likes'], 'likes')
-    comments_items = format_ranking_items(rankings['comments'], 'comments')
-    shares_items = format_ranking_items(rankings['shares'], 'shares')
+    likes_items = format_ranking_items(rankings['likes'], 'likes', is_growth=is_growth)
+    comments_items = format_ranking_items(rankings['comments'], 'comments', is_growth=is_growth)
+    shares_items = format_ranking_items(rankings['shares'], 'shares', is_growth=is_growth)
 
     def create_ranking_section(title, items, color, icon):
         return html.Div([
@@ -559,20 +567,84 @@ def create_ranking_panel(data):
             'marginBottom': '25px'
         })
 
+    abs_btn_style = {
+        'flex': '1',
+        'padding': '8px 12px',
+        'border': 'none',
+        'borderRadius': '6px',
+        'fontFamily': 'Microsoft YaHei',
+        'fontSize': '13px',
+        'fontWeight': 'bold',
+        'cursor': 'pointer',
+        'transition': 'all 0.3s ease'
+    }
+    growth_btn_style = abs_btn_style.copy()
+
+    if ranking_mode == 'absolute':
+        abs_btn_style.update({
+            'backgroundColor': '#3498DB',
+            'color': '#FFFFFF',
+            'boxShadow': '0 2px 6px rgba(52, 152, 219, 0.4)'
+        })
+        growth_btn_style.update({
+            'backgroundColor': '#F0F0F0',
+            'color': '#7F8C8D'
+        })
+    else:
+        growth_btn_style.update({
+            'backgroundColor': '#3498DB',
+            'color': '#FFFFFF',
+            'boxShadow': '0 2px 6px rgba(52, 152, 219, 0.4)'
+        })
+        abs_btn_style.update({
+            'backgroundColor': '#F0F0F0',
+            'color': '#7F8C8D'
+        })
+
     return html.Div([
-        html.Div(
-            '🏆 互动排行榜',
-            style={
-                'fontFamily': 'Microsoft YaHei',
-                'fontSize': '18px',
-                'fontWeight': 'bold',
-                'color': '#2C3E50',
-                'textAlign': 'center',
+        html.Div([
+            html.Div(
+                '🏆 互动排行榜',
+                style={
+                    'fontFamily': 'Microsoft YaHei',
+                    'fontSize': '18px',
+                    'fontWeight': 'bold',
+                    'color': '#2C3E50',
+                    'textAlign': 'center',
+                    'marginBottom': '12px'
+                }
+            ),
+            html.Div(
+                title_suffix,
+                style={
+                    'fontFamily': 'Microsoft YaHei',
+                    'fontSize': '12px',
+                    'color': '#7F8C8D',
+                    'textAlign': 'center',
+                    'marginBottom': '15px'
+                }
+            ),
+            html.Div([
+                html.Button(
+                    '📊 绝对数值',
+                    id='ranking-mode-absolute',
+                    n_clicks=0,
+                    style=abs_btn_style
+                ),
+                html.Button(
+                    '📈 增长率',
+                    id='ranking-mode-growth',
+                    n_clicks=0,
+                    style=growth_btn_style
+                )
+            ], style={
+                'display': 'flex',
+                'gap': '8px',
                 'marginBottom': '20px',
                 'paddingBottom': '15px',
                 'borderBottom': '2px solid #E8E8E8'
-            }
-        ),
+            })
+        ]),
         create_ranking_section('点赞排行榜', likes_items, '#FF6B6B', '👍'),
         create_ranking_section('评论排行榜', comments_items, '#4ECDC4', '💬'),
         create_ranking_section('分享排行榜', shares_items, '#FFE66D', '📤')
@@ -703,7 +775,7 @@ initial_fig = create_chart_figure(initial_data)
 initial_pie_fig = create_pie_chart_figure(initial_data)
 initial_trend_fig = create_trend_chart_figure(data_timer.get_all_periods_data())
 initial_table_data = create_table_data(initial_data)
-initial_ranking_panel = create_ranking_panel(initial_data)
+initial_ranking_panel = create_ranking_panel(initial_data, ranking_mode='absolute', changes_data=data_timer.calculate_changes('today'))
 initial_video_detail = create_video_detail_card(None, initial_data)
 initial_category_bar_fig = create_category_bar_chart_figure(initial_data)
 initial_category_summary = get_category_summary_rows(initial_data)
@@ -714,6 +786,7 @@ app.layout = html.Div([
     dcc.Store(id='selected-video-store', data=None),
     dcc.Store(id='scroll-trigger', data=0),
     dcc.Store(id='refresh-trigger', data=0),
+    dcc.Store(id='ranking-mode-store', data='absolute'),
     dcc.Interval(
         id='auto-refresh-interval',
         interval=30 * 1000,
@@ -1414,11 +1487,12 @@ app.layout = html.Div([
      Input('refresh-button', 'n_clicks'),
      Input('auto-refresh-interval', 'n_intervals'),
      Input('start-date-picker', 'date'),
-     Input('end-date-picker', 'date')],
+     Input('end-date-picker', 'date'),
+     Input('ranking-mode-store', 'data')],
     [State('refresh-trigger', 'data'),
      State('selected-video-store', 'data')]
 )
-def update_dashboard(selected_period, selected_category, refresh_clicks, auto_intervals, start_date, end_date, refresh_trigger, selected_video):
+def update_dashboard(selected_period, selected_category, refresh_clicks, auto_intervals, start_date, end_date, ranking_mode, refresh_trigger, selected_video):
     ctx = dash.callback_context
     triggered = ctx.triggered[0]['prop_id'].split('.')[0]
 
@@ -1515,7 +1589,16 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
         trend_figure = create_trend_chart_figure(filtered_all_periods)
 
     table_data = create_table_data(data)
-    ranking_panel = create_ranking_panel(data)
+
+    custom_start = start_date if selected_period == 'custom' else None
+    custom_end = end_date if selected_period == 'custom' else None
+    raw_changes = data_timer.calculate_changes(selected_period, custom_start, custom_end)
+    if selected_category != 'all':
+        from mock_data import VIDEO_CATEGORIES
+        changes_data = [c for c in raw_changes if VIDEO_CATEGORIES.get(c['video']) == selected_category]
+    else:
+        changes_data = raw_changes
+    ranking_panel = create_ranking_panel(data, ranking_mode=ranking_mode, changes_data=changes_data)
 
     if selected_video is not None:
         video_detail = create_video_detail_card(selected_video, data)
@@ -1647,6 +1730,25 @@ def update_video_detail_from_store(selected_video, selected_period, selected_cat
 )
 def toggle_auto_refresh(toggle_value):
     return 'on' not in toggle_value
+
+
+@app.callback(
+    Output('ranking-mode-store', 'data'),
+    [Input('ranking-mode-absolute', 'n_clicks'),
+     Input('ranking-mode-growth', 'n_clicks')],
+    [State('ranking-mode-store', 'data')],
+    prevent_initial_call=True
+)
+def toggle_ranking_mode(abs_clicks, growth_clicks, current_mode):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return current_mode
+    triggered = ctx.triggered[0]['prop_id'].split('.')[0]
+    if triggered == 'ranking-mode-absolute':
+        return 'absolute'
+    elif triggered == 'ranking-mode-growth':
+        return 'growth'
+    return current_mode
 
 
 app.clientside_callback(
