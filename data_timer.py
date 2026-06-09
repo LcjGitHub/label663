@@ -1,7 +1,7 @@
 import random
 import copy
 from datetime import datetime
-from mock_data import TIME_PERIOD_DATA, get_data_by_date_range
+from mock_data import TIME_PERIOD_DATA, get_data_by_date_range, get_daily_trend_by_date_range
 
 
 class DataTimer:
@@ -63,6 +63,17 @@ class DataTimer:
 
     def get_all_periods_data(self):
         return self.current_data
+
+    def get_custom_trend_data(self, start_date, end_date):
+        if not start_date or not end_date:
+            return {
+                'periods': [],
+                'total_likes': [],
+                'total_comments': [],
+                'total_shares': []
+            }
+        base_trend = get_daily_trend_by_date_range(start_date, end_date)
+        return base_trend
 
     def calculate_changes(self, period, start_date=None, end_date=None):
         if period == 'custom' and start_date and end_date:

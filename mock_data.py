@@ -106,5 +106,46 @@ def get_data_by_date_range(start_date, end_date):
     }
 
 
+def get_daily_trend_by_date_range(start_date, end_date):
+    start_str = _ensure_date_str(start_date)
+    end_str = _ensure_date_str(end_date)
+
+    try:
+        start_dt = datetime.strptime(start_str, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_str, '%Y-%m-%d')
+    except ValueError:
+        return {
+            'periods': [],
+            'total_likes': [],
+            'total_comments': [],
+            'total_shares': []
+        }
+
+    if start_dt > end_dt:
+        start_dt, end_dt = end_dt, start_dt
+
+    periods = []
+    total_likes = []
+    total_comments = []
+    total_shares = []
+
+    current_dt = start_dt
+    while current_dt <= end_dt:
+        date_str = current_dt.strftime('%Y-%m-%d')
+        daily = _generate_daily_data(date_str)
+        periods.append(date_str)
+        total_likes.append(sum(daily['likes']))
+        total_comments.append(sum(daily['comments']))
+        total_shares.append(sum(daily['shares']))
+        current_dt += timedelta(days=1)
+
+    return {
+        'periods': periods,
+        'total_likes': total_likes,
+        'total_comments': total_comments,
+        'total_shares': total_shares
+    }
+
+
 def get_data_by_period(period):
     return TIME_PERIOD_DATA.get(period, TIME_PERIOD_DATA['today'])

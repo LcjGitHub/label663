@@ -110,14 +110,20 @@ def create_table_data(data):
     return table_rows
 
 
-def create_trend_chart_figure(all_periods_data=None):
-    if all_periods_data is None:
-        all_periods_data = TIME_PERIOD_DATA
-    trend_info = get_aggregated_trend_data(all_periods_data)
-    periods = trend_info['periods']
-    total_likes = trend_info['total_likes']
-    total_comments = trend_info['total_comments']
-    total_shares = trend_info['total_shares']
+def create_trend_chart_figure(all_periods_data=None, trend_data=None):
+    if trend_data is not None:
+        periods = trend_data['periods']
+        total_likes = trend_data['total_likes']
+        total_comments = trend_data['total_comments']
+        total_shares = trend_data['total_shares']
+    else:
+        if all_periods_data is None:
+            all_periods_data = TIME_PERIOD_DATA
+        trend_info = get_aggregated_trend_data(all_periods_data)
+        periods = trend_info['periods']
+        total_likes = trend_info['total_likes']
+        total_comments = trend_info['total_comments']
+        total_shares = trend_info['total_shares']
 
     fig = go.Figure()
 
@@ -1425,6 +1431,68 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
     if should_refresh:
         data_timer.refresh_data()
 
+    is_custom_incomplete = selected_period == 'custom' and (not start_date or not end_date)
+
+    if is_custom_incomplete:
+        hint = '⚠️ 请选择完整的开始日期和结束日期'
+        empty_fig = go.Figure()
+        empty_fig.update_layout(
+            annotations=[{
+                'text': hint,
+                'showarrow': False,
+                'font': {'size': 18, 'color': '#E74C3C', 'family': 'Microsoft YaHei'}
+            }],
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            xaxis={'visible': False},
+            yaxis={'visible': False},
+            height=500
+        )
+        empty_pie = go.Figure()
+        empty_pie.update_layout(
+            annotations=[{
+                'text': hint,
+                'showarrow': False,
+                'font': {'size': 18, 'color': '#E74C3C', 'family': 'Microsoft YaHei'}
+            }],
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            height=500
+        )
+        empty_trend = go.Figure()
+        empty_trend.update_layout(
+            annotations=[{
+                'text': hint,
+                'showarrow': False,
+                'font': {'size': 18, 'color': '#E74C3C', 'family': 'Microsoft YaHei'}
+            }],
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            xaxis_title={'text': '时间段', 'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}},
+            yaxis_title={'text': '互动合计数量', 'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}},
+            height=450
+        )
+        empty_category = go.Figure()
+        empty_category.update_layout(
+            annotations=[{
+                'text': hint,
+                'showarrow': False,
+                'font': {'size': 18, 'color': '#E74C3C', 'family': 'Microsoft YaHei'}
+            }],
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            height=450
+        )
+        last_update_time = data_timer.get_last_update_time()
+        period_labels = {'today': '今日', 'week': '本周', 'month': '本月', 'custom': '自定义'}
+        period_label = period_labels.get(selected_period, selected_period)
+        footer_text = f'数据来源：模拟数据 | 当前查询：{period_label} | 更新时间：{last_update_time}'
+        return (hint, hint, hint, hint, empty_fig, empty_pie, empty_trend, [],
+                html.Div(hint, style={'color': '#E74C3C', 'fontFamily': 'Microsoft YaHei', 'textAlign': 'center', 'padding': '20px'}),
+                html.Div(hint, style={'color': '#E74C3C', 'fontFamily': 'Microsoft YaHei', 'textAlign': 'center', 'padding': '20px'}),
+                None, empty_category, [], last_update_time, html.Div([]),
+                html.Div([]), html.Div([]), html.Div([]), html.Div([]), footer_text)
+
     if selected_period == 'custom' and start_date and end_date:
         raw_data = data_timer.get_data_by_custom_range(start_date, end_date)
     else:
@@ -1439,8 +1507,12 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
     figure = create_chart_figure(data)
     pie_figure = create_pie_chart_figure(data)
 
-    filtered_all_periods = filter_all_periods_by_category(data_timer.get_all_periods_data(), selected_category)
-    trend_figure = create_trend_chart_figure(filtered_all_periods)
+    if selected_period == 'custom' and start_date and end_date:
+        custom_trend = data_timer.get_custom_trend_data(start_date, end_date)
+        trend_figure = create_trend_chart_figure(trend_data=custom_trend)
+    else:
+        filtered_all_periods = filter_all_periods_by_category(data_timer.get_all_periods_data(), selected_category)
+        trend_figure = create_trend_chart_figure(filtered_all_periods)
 
     table_data = create_table_data(data)
     ranking_panel = create_ranking_panel(data)
@@ -1467,7 +1539,12 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
     shares_change_ind = create_stat_change_indicator(total_changes['shares_change'])
     interactions_change_ind = create_stat_change_indicator(total_changes['total_change'])
 
-    footer_text = f'数据来源：模拟数据 | 更新时间：{last_update_time}'
+    period_labels = {'today': '今日', 'week': '本周', 'month': '本月', 'custom': '自定义'}
+    period_label = period_labels.get(selected_period, selected_period)
+    if selected_period == 'custom' and start_date and end_date:
+        footer_text = f'数据来源：模拟数据 | 当前查询：{period_label}（{start_date} 至 {end_date}） | 更新时间：{last_update_time}'
+    else:
+        footer_text = f'数据来源：模拟数据 | 当前查询：{period_label} | 更新时间：{last_update_time}'
 
     return total_likes, total_comments, total_shares, total_interactions, figure, pie_figure, trend_figure, table_data, ranking_panel, video_detail, video_store_value, category_bar_fig, category_summary, last_update_time, change_indicators, likes_change_ind, comments_change_ind, shares_change_ind, interactions_change_ind, footer_text
 
@@ -1516,6 +1593,19 @@ def toggle_custom_date_range(selected_period):
             'display': 'none',
             'alignItems': 'center'
         }
+
+
+@app.callback(
+    Output('time-period-dropdown', 'value'),
+    [Input('start-date-picker', 'date'),
+     Input('end-date-picker', 'date')],
+    [State('time-period-dropdown', 'value')],
+    prevent_initial_call=True
+)
+def auto_switch_to_custom(start_date, end_date, current_period):
+    if current_period != 'custom' and (start_date or end_date):
+        return 'custom'
+    return dash.no_update
 
 
 @app.callback(
