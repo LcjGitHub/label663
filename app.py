@@ -2,7 +2,8 @@ import dash
 from dash import html, dcc, dash_table, Input, Output, State
 import plotly.graph_objects as go
 import numpy as np
-from mock_data import get_data_by_period
+from mock_data import get_data_by_period, TIME_PERIOD_DATA
+from utils import calculate_rankings, format_ranking_items, get_trend_data, format_number
 
 app = dash.Dash(__name__)
 app.title = "内容互动分析"
@@ -104,9 +105,178 @@ def create_table_data(data):
     return table_rows
 
 
+def create_trend_chart_figure():
+    trend_info = get_trend_data(TIME_PERIOD_DATA)
+    periods = trend_info['periods']
+    videos = trend_info['videos']
+    trend_by_video = trend_info['trend_by_video']
+
+    fig = go.Figure()
+
+    for video in videos:
+        fig.add_trace(go.Scatter(
+            x=periods,
+            y=trend_by_video[video]['likes'],
+            mode='lines+markers',
+            name=f'{video} - 点赞',
+            line=dict(color='#FF6B6B', width=2),
+            marker=dict(size=8),
+            hovertemplate='<b>%{x}</b><br>' + f'{video}<br>' + '点赞：%{y}<extra></extra>',
+            legendgroup='likes',
+            visible=True
+        ))
+
+    for video in videos:
+        fig.add_trace(go.Scatter(
+            x=periods,
+            y=trend_by_video[video]['comments'],
+            mode='lines+markers',
+            name=f'{video} - 评论',
+            line=dict(color='#4ECDC4', width=2),
+            marker=dict(size=8),
+            hovertemplate='<b>%{x}</b><br>' + f'{video}<br>' + '评论：%{y}<extra></extra>',
+            legendgroup='comments',
+            visible='legendonly'
+        ))
+
+    for video in videos:
+        fig.add_trace(go.Scatter(
+            x=periods,
+            y=trend_by_video[video]['shares'],
+            mode='lines+markers',
+            name=f'{video} - 分享',
+            line=dict(color='#FFE66D', width=2),
+            marker=dict(size=8),
+            hovertemplate='<b>%{x}</b><br>' + f'{video}<br>' + '分享：%{y}<extra></extra>',
+            legendgroup='shares',
+            visible='legendonly'
+        ))
+
+    fig.update_layout(
+        title={
+            'text': '互动趋势分析',
+            'font': {'size': 20, 'family': 'Microsoft YaHei', 'color': '#2C3E50'},
+            'y': 0.95,
+            'x': 0.5
+        },
+        xaxis_title={
+            'text': '时间段',
+            'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
+        },
+        yaxis_title={
+            'text': '互动数量',
+            'font': {'size': 14, 'family': 'Microsoft YaHei', 'color': '#7F8C8D'}
+        },
+        hovermode='x unified',
+        showlegend=True,
+        legend={
+            'orientation': 'h',
+            'y': -0.3,
+            'x': 0.5,
+            'xanchor': 'center',
+            'font': {'size': 11, 'family': 'Microsoft YaHei'},
+            'groupclick': 'toggleitem'
+        },
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font={'family': 'Microsoft YaHei'},
+        margin={'t': 60, 'l': 60, 'r': 40, 'b': 120},
+        height=450
+    )
+
+    fig.update_xaxes(
+        tickfont={'family': 'Microsoft YaHei', 'size': 12, 'color': '#34495E'},
+        gridcolor='rgba(0,0,0,0.1)'
+    )
+
+    fig.update_yaxes(
+        tickfont={'family': 'Microsoft YaHei', 'size': 12, 'color': '#34495E'},
+        gridcolor='rgba(0,0,0,0.1)'
+    )
+
+    return fig
+
+
+def create_ranking_panel(data):
+    rankings = calculate_rankings(data, top_n=3)
+
+    likes_items = format_ranking_items(rankings['likes'], 'likes')
+    comments_items = format_ranking_items(rankings['comments'], 'comments')
+    shares_items = format_ranking_items(rankings['shares'], 'shares')
+
+    def create_ranking_section(title, items, color, icon):
+        return html.Div([
+            html.Div([
+                html.Span(icon, style={'marginRight': '8px'}),
+                html.Span(title, style={
+                    'fontFamily': 'Microsoft YaHei',
+                    'fontSize': '16px',
+                    'fontWeight': 'bold',
+                    'color': '#2C3E50'
+                })
+            ], style={
+                'display': 'flex',
+                'alignItems': 'center',
+                'marginBottom': '15px',
+                'paddingBottom': '10px',
+                'borderBottom': '2px solid ' + color
+            }),
+            html.Div([
+                html.Div([
+                    html.Span(item['medal'], style={
+                        'fontSize': '20px',
+                        'width': '30px',
+                        'display': 'inline-block'
+                    }),
+                    html.Span(item['name'], style={
+                        'flex': '1',
+                        'fontFamily': 'Microsoft YaHei',
+                        'fontSize': '13px',
+                        'color': '#34495E'
+                    }),
+                    html.Span(item['value'], style={
+                        'fontFamily': 'Microsoft YaHei',
+                        'fontSize': '14px',
+                        'fontWeight': 'bold',
+                        'color': color
+                    })
+                ], style={
+                    'display': 'flex',
+                    'alignItems': 'center',
+                    'padding': '8px 0',
+                    'borderBottom': '1px solid #F0F0F0' if idx < len(items) - 1 else 'none'
+                })
+                for idx, item in enumerate(items)
+            ])
+        ], style={
+            'marginBottom': '25px'
+        })
+
+    return html.Div([
+        html.Div(
+            '🏆 互动排行榜',
+            style={
+                'fontFamily': 'Microsoft YaHei',
+                'fontSize': '18px',
+                'fontWeight': 'bold',
+                'color': '#2C3E50',
+                'textAlign': 'center',
+                'marginBottom': '20px',
+                'paddingBottom': '15px',
+                'borderBottom': '2px solid #E8E8E8'
+            }
+        ),
+        create_ranking_section('点赞排行榜', likes_items, '#FF6B6B', '👍'),
+        create_ranking_section('评论排行榜', comments_items, '#4ECDC4', '💬'),
+        create_ranking_section('分享排行榜', shares_items, '#FFA500', '📤')
+    ])
+
+
 initial_data = get_data_by_period('today')
 initial_fig = create_chart_figure(initial_data)
+initial_trend_fig = create_trend_chart_figure()
 initial_table_data = create_table_data(initial_data)
+initial_ranking_panel = create_ranking_panel(initial_data)
 
 app.layout = html.Div([
     html.Div(
@@ -191,169 +361,225 @@ app.layout = html.Div([
     ),
 
     html.Div(
-        className='stats-cards',
-        id='stats-cards',
+        className='main-content',
         children=[
             html.Div(
-                className='stat-card',
+                className='left-column',
                 children=[
-                    html.Div('👍', style={'fontSize': '32px', 'marginBottom': '10px'}),
-                    html.Div('总点赞数', style={'color': '#7F8C8D', 'fontSize': '14px', 'marginBottom': '5px'}),
-                    html.Div(id='total-likes', children=f'{sum(initial_data["likes"]):,}',
-                             style={'color': '#FF6B6B', 'fontSize': '28px', 'fontWeight': 'bold'})
+                    html.Div(
+                        className='stats-cards',
+                        id='stats-cards',
+                        children=[
+                            html.Div(
+                                className='stat-card',
+                                children=[
+                                    html.Div('👍', style={'fontSize': '32px', 'marginBottom': '10px'}),
+                                    html.Div('总点赞数', style={'color': '#7F8C8D', 'fontSize': '14px', 'marginBottom': '5px'}),
+                                    html.Div(id='total-likes', children=f'{sum(initial_data["likes"]):,}',
+                                             style={'color': '#FF6B6B', 'fontSize': '28px', 'fontWeight': 'bold'})
+                                ],
+                                style={
+                                    'backgroundColor': '#FFFFFF',
+                                    'borderRadius': '8px',
+                                    'padding': '20px',
+                                    'textAlign': 'center',
+                                    'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
+                                    'flex': '1',
+                                    'minWidth': '150px',
+                                    'margin': '10px 5px'
+                                }
+                            ),
+                            html.Div(
+                                className='stat-card',
+                                children=[
+                                    html.Div('💬', style={'fontSize': '32px', 'marginBottom': '10px'}),
+                                    html.Div('总评论数', style={'color': '#7F8C8D', 'fontSize': '14px', 'marginBottom': '5px'}),
+                                    html.Div(id='total-comments', children=f'{sum(initial_data["comments"]):,}',
+                                             style={'color': '#4ECDC4', 'fontSize': '28px', 'fontWeight': 'bold'})
+                                ],
+                                style={
+                                    'backgroundColor': '#FFFFFF',
+                                    'borderRadius': '8px',
+                                    'padding': '20px',
+                                    'textAlign': 'center',
+                                    'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
+                                    'flex': '1',
+                                    'minWidth': '150px',
+                                    'margin': '10px 5px'
+                                }
+                            ),
+                            html.Div(
+                                className='stat-card',
+                                children=[
+                                    html.Div('📤', style={'fontSize': '32px', 'marginBottom': '10px'}),
+                                    html.Div('总分享数', style={'color': '#7F8C8D', 'fontSize': '14px', 'marginBottom': '5px'}),
+                                    html.Div(id='total-shares', children=f'{sum(initial_data["shares"]):,}',
+                                             style={'color': '#FFE66D', 'fontSize': '28px', 'fontWeight': 'bold'})
+                                ],
+                                style={
+                                    'backgroundColor': '#FFFFFF',
+                                    'borderRadius': '8px',
+                                    'padding': '20px',
+                                    'textAlign': 'center',
+                                    'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
+                                    'flex': '1',
+                                    'minWidth': '150px',
+                                    'margin': '10px 5px'
+                                }
+                            ),
+                            html.Div(
+                                className='stat-card',
+                                children=[
+                                    html.Div('📈', style={'fontSize': '32px', 'marginBottom': '10px'}),
+                                    html.Div('总互动数', style={'color': '#7F8C8D', 'fontSize': '14px', 'marginBottom': '5px'}),
+                                    html.Div(id='total-interactions',
+                                             children=f'{sum(initial_data["likes"]) + sum(initial_data["comments"]) + sum(initial_data["shares"]):,}',
+                                             style={'color': '#9B59B6', 'fontSize': '28px', 'fontWeight': 'bold'})
+                                ],
+                                style={
+                                    'backgroundColor': '#FFFFFF',
+                                    'borderRadius': '8px',
+                                    'padding': '20px',
+                                    'textAlign': 'center',
+                                    'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
+                                    'flex': '1',
+                                    'minWidth': '150px',
+                                    'margin': '10px 5px'
+                                }
+                            )
+                        ],
+                        style={
+                            'display': 'flex',
+                            'flexWrap': 'wrap',
+                            'justifyContent': 'space-around',
+                            'margin': '0'
+                        }
+                    ),
+
+                    html.Div(
+                        className='chart-container',
+                        children=[
+                            dcc.Graph(
+                                id='stacked-bar-chart',
+                                figure=initial_fig,
+                                style={'height': '500px'}
+                            )
+                        ],
+                        style={
+                            'backgroundColor': '#FFFFFF',
+                            'borderRadius': '8px',
+                            'padding': '20px',
+                            'margin': '20px 0 0 0',
+                            'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
+                        }
+                    ),
+
+                    html.Div(
+                        className='trend-chart-container',
+                        children=[
+                            dcc.Graph(
+                                id='trend-line-chart',
+                                figure=initial_trend_fig,
+                                style={'height': '450px'}
+                            )
+                        ],
+                        style={
+                            'backgroundColor': '#FFFFFF',
+                            'borderRadius': '8px',
+                            'padding': '20px',
+                            'margin': '20px 0 0 0',
+                            'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
+                        }
+                    ),
+
+                    html.Div(
+                        className='data-table-container',
+                        children=[
+                            html.H3(
+                                '📋 视频互动数据明细',
+                                style={
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'color': '#2C3E50',
+                                    'margin': '0 0 15px 0',
+                                    'fontSize': '18px'
+                                }
+                            ),
+                            dash_table.DataTable(
+                                id='video-data-table',
+                                columns=[
+                                    {'name': '视频名称', 'id': 'video_name'},
+                                    {'name': '点赞数', 'id': 'likes'},
+                                    {'name': '评论数', 'id': 'comments'},
+                                    {'name': '分享数', 'id': 'shares'},
+                                    {'name': '合计', 'id': 'total'}
+                                ],
+                                data=initial_table_data,
+                                style_header={
+                                    'backgroundColor': '#2C3E50',
+                                    'color': '#FFFFFF',
+                                    'fontWeight': 'bold',
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '14px',
+                                    'textAlign': 'center',
+                                    'padding': '12px'
+                                },
+                                style_cell={
+                                    'fontFamily': 'Microsoft YaHei',
+                                    'fontSize': '13px',
+                                    'textAlign': 'center',
+                                    'padding': '10px',
+                                    'backgroundColor': '#FFFFFF'
+                                },
+                                style_data_conditional=[
+                                    {
+                                        'if': {'row_index': 'odd'},
+                                        'backgroundColor': '#F8F9FA'
+                                    }
+                                ],
+                                style_table={
+                                    'borderRadius': '8px',
+                                    'overflow': 'hidden'
+                                }
+                            )
+                        ],
+                        style={
+                            'backgroundColor': '#FFFFFF',
+                            'borderRadius': '8px',
+                            'padding': '20px',
+                            'margin': '20px 0 0 0',
+                            'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
+                        }
+                    )
                 ],
                 style={
-                    'backgroundColor': '#FFFFFF',
-                    'borderRadius': '8px',
-                    'padding': '20px',
-                    'textAlign': 'center',
-                    'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
                     'flex': '1',
-                    'minWidth': '200px',
-                    'margin': '20px 10px'
+                    'minWidth': '0',
+                    'marginRight': '20px'
                 }
             ),
+
             html.Div(
-                className='stat-card',
-                children=[
-                    html.Div('💬', style={'fontSize': '32px', 'marginBottom': '10px'}),
-                    html.Div('总评论数', style={'color': '#7F8C8D', 'fontSize': '14px', 'marginBottom': '5px'}),
-                    html.Div(id='total-comments', children=f'{sum(initial_data["comments"]):,}',
-                             style={'color': '#4ECDC4', 'fontSize': '28px', 'fontWeight': 'bold'})
-                ],
+                className='right-sidebar',
+                id='ranking-sidebar',
+                children=initial_ranking_panel,
                 style={
+                    'width': '300px',
+                    'flexShrink': '0',
                     'backgroundColor': '#FFFFFF',
                     'borderRadius': '8px',
-                    'padding': '20px',
-                    'textAlign': 'center',
+                    'padding': '25px',
                     'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
-                    'flex': '1',
-                    'minWidth': '200px',
-                    'margin': '20px 10px'
-                }
-            ),
-            html.Div(
-                className='stat-card',
-                children=[
-                    html.Div('📤', style={'fontSize': '32px', 'marginBottom': '10px'}),
-                    html.Div('总分享数', style={'color': '#7F8C8D', 'fontSize': '14px', 'marginBottom': '5px'}),
-                    html.Div(id='total-shares', children=f'{sum(initial_data["shares"]):,}',
-                             style={'color': '#FFE66D', 'fontSize': '28px', 'fontWeight': 'bold'})
-                ],
-                style={
-                    'backgroundColor': '#FFFFFF',
-                    'borderRadius': '8px',
-                    'padding': '20px',
-                    'textAlign': 'center',
-                    'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
-                    'flex': '1',
-                    'minWidth': '200px',
-                    'margin': '20px 10px'
-                }
-            ),
-            html.Div(
-                className='stat-card',
-                children=[
-                    html.Div('📈', style={'fontSize': '32px', 'marginBottom': '10px'}),
-                    html.Div('总互动数', style={'color': '#7F8C8D', 'fontSize': '14px', 'marginBottom': '5px'}),
-                    html.Div(id='total-interactions',
-                             children=f'{sum(initial_data["likes"]) + sum(initial_data["comments"]) + sum(initial_data["shares"]):,}',
-                             style={'color': '#9B59B6', 'fontSize': '28px', 'fontWeight': 'bold'})
-                ],
-                style={
-                    'backgroundColor': '#FFFFFF',
-                    'borderRadius': '8px',
-                    'padding': '20px',
-                    'textAlign': 'center',
-                    'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
-                    'flex': '1',
-                    'minWidth': '200px',
-                    'margin': '20px 10px'
+                    'height': 'fit-content',
+                    'position': 'sticky',
+                    'top': '20px'
                 }
             )
         ],
         style={
             'display': 'flex',
-            'flexWrap': 'wrap',
-            'justifyContent': 'space-around',
-            'margin': '0 20px'
-        }
-    ),
-
-    html.Div(
-        className='chart-container',
-        children=[
-            dcc.Graph(
-                id='stacked-bar-chart',
-                figure=initial_fig,
-                style={'height': '600px'}
-            )
-        ],
-        style={
-            'backgroundColor': '#FFFFFF',
-            'borderRadius': '8px',
-            'padding': '20px',
+            'alignItems': 'flex-start',
             'margin': '20px',
-            'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
-        }
-    ),
-
-    html.Div(
-        className='data-table-container',
-        children=[
-            html.H3(
-                '📋 视频互动数据明细',
-                style={
-                    'fontFamily': 'Microsoft YaHei',
-                    'color': '#2C3E50',
-                    'margin': '0 0 15px 0',
-                    'fontSize': '18px'
-                }
-            ),
-            dash_table.DataTable(
-                id='video-data-table',
-                columns=[
-                    {'name': '视频名称', 'id': 'video_name'},
-                    {'name': '点赞数', 'id': 'likes'},
-                    {'name': '评论数', 'id': 'comments'},
-                    {'name': '分享数', 'id': 'shares'},
-                    {'name': '合计', 'id': 'total'}
-                ],
-                data=initial_table_data,
-                style_header={
-                    'backgroundColor': '#2C3E50',
-                    'color': '#FFFFFF',
-                    'fontWeight': 'bold',
-                    'fontFamily': 'Microsoft YaHei',
-                    'fontSize': '14px',
-                    'textAlign': 'center',
-                    'padding': '12px'
-                },
-                style_cell={
-                    'fontFamily': 'Microsoft YaHei',
-                    'fontSize': '13px',
-                    'textAlign': 'center',
-                    'padding': '10px',
-                    'backgroundColor': '#FFFFFF'
-                },
-                style_data_conditional=[
-                    {
-                        'if': {'row_index': 'odd'},
-                        'backgroundColor': '#F8F9FA'
-                    }
-                ],
-                style_table={
-                    'borderRadius': '8px',
-                    'overflow': 'hidden'
-                }
-            )
-        ],
-        style={
-            'backgroundColor': '#FFFFFF',
-            'borderRadius': '8px',
-            'padding': '20px',
-            'margin': '20px',
-            'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
+            'gap': '0'
         }
     ),
 
@@ -384,7 +610,8 @@ app.layout = html.Div([
      Output('total-shares', 'children'),
      Output('total-interactions', 'children'),
      Output('stacked-bar-chart', 'figure'),
-     Output('video-data-table', 'data')],
+     Output('video-data-table', 'data'),
+     Output('ranking-sidebar', 'children')],
     [Input('time-period-dropdown', 'value')]
 )
 def update_dashboard(selected_period):
@@ -397,8 +624,9 @@ def update_dashboard(selected_period):
 
     figure = create_chart_figure(data)
     table_data = create_table_data(data)
+    ranking_panel = create_ranking_panel(data)
 
-    return total_likes, total_comments, total_shares, total_interactions, figure, table_data
+    return total_likes, total_comments, total_shares, total_interactions, figure, table_data, ranking_panel
 
 
 if __name__ == '__main__':
