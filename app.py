@@ -664,6 +664,34 @@ def create_change_indicators(period, selected_category='all'):
     ])
 
 
+def create_stat_change_indicator(value):
+    direction = data_timer.get_change_direction(value)
+    if direction == 'up':
+        icon = '↑'
+        color = '#27AE60'
+    elif direction == 'down':
+        icon = '↓'
+        color = '#E74C3C'
+    else:
+        icon = '→'
+        color = '#7F8C8D'
+
+    return html.Div([
+        html.Span(icon, style={
+            'fontSize': '16px',
+            'fontWeight': 'bold',
+            'color': color,
+            'marginRight': '4px'
+        }),
+        html.Span(data_timer.format_change(value), style={
+            'fontSize': '13px',
+            'fontWeight': 'bold',
+            'color': color,
+            'fontFamily': 'Microsoft YaHei'
+        })
+    ])
+
+
 initial_data = data_timer.get_data_by_period('today')
 initial_fig = create_chart_figure(initial_data)
 initial_pie_fig = create_pie_chart_figure(initial_data)
@@ -885,7 +913,9 @@ app.layout = html.Div([
                                     html.Div('👍', style={'fontSize': '32px', 'marginBottom': '10px'}),
                                     html.Div('总点赞数', style={'color': '#7F8C8D', 'fontSize': '14px', 'marginBottom': '5px'}),
                                     html.Div(id='total-likes', children=f'{sum(initial_data["likes"]):,}',
-                                             style={'color': '#FF6B6B', 'fontSize': '28px', 'fontWeight': 'bold'})
+                                             style={'color': '#FF6B6B', 'fontSize': '28px', 'fontWeight': 'bold'}),
+                                    html.Div(id='total-likes-change', children=[],
+                                             style={'marginTop': '8px', 'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'})
                                 ],
                                 style={
                                     'backgroundColor': '#FFFFFF',
@@ -904,7 +934,9 @@ app.layout = html.Div([
                                     html.Div('💬', style={'fontSize': '32px', 'marginBottom': '10px'}),
                                     html.Div('总评论数', style={'color': '#7F8C8D', 'fontSize': '14px', 'marginBottom': '5px'}),
                                     html.Div(id='total-comments', children=f'{sum(initial_data["comments"]):,}',
-                                             style={'color': '#4ECDC4', 'fontSize': '28px', 'fontWeight': 'bold'})
+                                             style={'color': '#4ECDC4', 'fontSize': '28px', 'fontWeight': 'bold'}),
+                                    html.Div(id='total-comments-change', children=[],
+                                             style={'marginTop': '8px', 'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'})
                                 ],
                                 style={
                                     'backgroundColor': '#FFFFFF',
@@ -923,7 +955,9 @@ app.layout = html.Div([
                                     html.Div('📤', style={'fontSize': '32px', 'marginBottom': '10px'}),
                                     html.Div('总分享数', style={'color': '#7F8C8D', 'fontSize': '14px', 'marginBottom': '5px'}),
                                     html.Div(id='total-shares', children=f'{sum(initial_data["shares"]):,}',
-                                             style={'color': '#FFE66D', 'fontSize': '28px', 'fontWeight': 'bold'})
+                                             style={'color': '#FFE66D', 'fontSize': '28px', 'fontWeight': 'bold'}),
+                                    html.Div(id='total-shares-change', children=[],
+                                             style={'marginTop': '8px', 'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'})
                                 ],
                                 style={
                                     'backgroundColor': '#FFFFFF',
@@ -943,7 +977,9 @@ app.layout = html.Div([
                                     html.Div('总互动数', style={'color': '#7F8C8D', 'fontSize': '14px', 'marginBottom': '5px'}),
                                     html.Div(id='total-interactions',
                                              children=f'{sum(initial_data["likes"]) + sum(initial_data["comments"]) + sum(initial_data["shares"]):,}',
-                                             style={'color': '#9B59B6', 'fontSize': '28px', 'fontWeight': 'bold'})
+                                             style={'color': '#9B59B6', 'fontSize': '28px', 'fontWeight': 'bold'}),
+                                    html.Div(id='total-interactions-change', children=[],
+                                             style={'marginTop': '8px', 'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'})
                                 ],
                                 style={
                                     'backgroundColor': '#FFFFFF',
@@ -1277,7 +1313,8 @@ app.layout = html.Div([
         className='footer',
         children=[
             html.P(
-                '数据来源：模拟数据 | 更新时间：2026-06-09',
+                id='footer-text',
+                children=f'数据来源：模拟数据 | 更新时间：{data_timer.get_last_update_time()}',
                 style={
                     'textAlign': 'center',
                     'color': '#BDC3C7',
@@ -1309,18 +1346,30 @@ app.layout = html.Div([
      Output('category-bar-chart', 'figure'),
      Output('category-summary-table', 'data'),
      Output('last-update-time', 'children'),
-     Output('change-indicator-container', 'children')],
+     Output('change-indicator-container', 'children'),
+     Output('total-likes-change', 'children'),
+     Output('total-comments-change', 'children'),
+     Output('total-shares-change', 'children'),
+     Output('total-interactions-change', 'children'),
+     Output('footer-text', 'children')],
     [Input('time-period-dropdown', 'value'),
      Input('category-radio', 'value'),
      Input('refresh-button', 'n_clicks'),
      Input('auto-refresh-interval', 'n_intervals')],
-    [State('refresh-trigger', 'data')]
+    [State('refresh-trigger', 'data'),
+     State('selected-video-store', 'data')]
 )
-def update_dashboard(selected_period, selected_category, refresh_clicks, auto_intervals, refresh_trigger):
+def update_dashboard(selected_period, selected_category, refresh_clicks, auto_intervals, refresh_trigger, selected_video):
     ctx = dash.callback_context
     triggered = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    if triggered in ['refresh-button', 'auto-refresh-interval']:
+    should_refresh = False
+    if triggered == 'refresh-button' and refresh_clicks is not None and refresh_clicks > 0:
+        should_refresh = True
+    elif triggered == 'auto-refresh-interval' and auto_intervals is not None and auto_intervals > 0:
+        should_refresh = True
+
+    if should_refresh:
         data_timer.refresh_data()
 
     raw_data = data_timer.get_data_by_period(selected_period)
@@ -1340,7 +1389,12 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
     table_data = create_table_data(data)
     ranking_panel = create_ranking_panel(data)
 
-    video_detail = create_video_detail_card(None, data)
+    if selected_video is not None:
+        video_detail = create_video_detail_card(selected_video, data)
+        video_store_value = selected_video
+    else:
+        video_detail = create_video_detail_card(None, data)
+        video_store_value = None
 
     category_bar_fig = create_category_bar_chart_figure(data)
     category_summary = get_category_summary_rows(data)
@@ -1348,7 +1402,15 @@ def update_dashboard(selected_period, selected_category, refresh_clicks, auto_in
     last_update_time = data_timer.get_last_update_time()
     change_indicators = create_change_indicators(selected_period, selected_category)
 
-    return total_likes, total_comments, total_shares, total_interactions, figure, pie_figure, trend_figure, table_data, ranking_panel, video_detail, None, category_bar_fig, category_summary, last_update_time, change_indicators
+    total_changes = data_timer.calculate_total_changes(selected_period)
+    likes_change_ind = create_stat_change_indicator(total_changes['likes_change'])
+    comments_change_ind = create_stat_change_indicator(total_changes['comments_change'])
+    shares_change_ind = create_stat_change_indicator(total_changes['shares_change'])
+    interactions_change_ind = create_stat_change_indicator(total_changes['total_change'])
+
+    footer_text = f'数据来源：模拟数据 | 更新时间：{last_update_time}'
+
+    return total_likes, total_comments, total_shares, total_interactions, figure, pie_figure, trend_figure, table_data, ranking_panel, video_detail, video_store_value, category_bar_fig, category_summary, last_update_time, change_indicators, likes_change_ind, comments_change_ind, shares_change_ind, interactions_change_ind, footer_text
 
 
 @app.callback(
