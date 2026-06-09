@@ -42,7 +42,7 @@ def filter_data_by_category(data, primary_category, secondary_category='all'):
     }
 
 
-def calculate_category_stats(data):
+def calculate_category_stats(data, primary_category='all', secondary_category='all'):
     categories_list = data.get('categories', [])
     secondary_categories_list = data.get('secondary_categories', [])
     videos = data['videos']
@@ -50,8 +50,18 @@ def calculate_category_stats(data):
     comments = data['comments']
     shares = data['shares']
 
+    if primary_category == 'all':
+        display_categories = CATEGORIES
+        use_secondary = False
+    elif secondary_category == 'all':
+        display_categories = CATEGORY_HIERARCHY.get(primary_category, [])
+        use_secondary = True
+    else:
+        display_categories = [secondary_category]
+        use_secondary = True
+
     category_data = {}
-    for cat in CATEGORIES:
+    for cat in display_categories:
         category_data[cat] = {
             'video_count': 0,
             'total_likes': 0,
@@ -60,7 +70,11 @@ def calculate_category_stats(data):
         }
 
     for i in range(len(videos)):
-        cat = categories_list[i] if i < len(categories_list) else None
+        if use_secondary:
+            cat = secondary_categories_list[i] if i < len(secondary_categories_list) else None
+        else:
+            cat = categories_list[i] if i < len(categories_list) else None
+
         if cat and cat in category_data:
             category_data[cat]['video_count'] += 1
             category_data[cat]['total_likes'] += likes[i]
@@ -68,8 +82,8 @@ def calculate_category_stats(data):
             category_data[cat]['total_shares'] += shares[i]
 
     result = []
-    for cat in CATEGORIES:
-        d = category_data[cat]
+    for cat in display_categories:
+        d = category_data.get(cat, {'video_count': 0, 'total_likes': 0, 'total_comments': 0, 'total_shares': 0})
         count = d['video_count']
         avg_likes = round(d['total_likes'] / count, 2) if count > 0 else 0
         avg_comments = round(d['total_comments'] / count, 2) if count > 0 else 0
@@ -86,8 +100,8 @@ def calculate_category_stats(data):
     return result
 
 
-def get_category_summary_rows(data):
-    stats = calculate_category_stats(data)
+def get_category_summary_rows(data, primary_category='all', secondary_category='all'):
+    stats = calculate_category_stats(data, primary_category, secondary_category)
     rows = []
     for s in stats:
         rows.append({
@@ -100,15 +114,15 @@ def get_category_summary_rows(data):
     return rows
 
 
-def get_category_bar_data(data, metric='avg_total'):
-    stats = calculate_category_stats(data)
+def get_category_bar_data(data, metric='avg_total', primary_category='all', secondary_category='all'):
+    stats = calculate_category_stats(data, primary_category, secondary_category)
     categories = [s['category'] for s in stats]
     values = [s[metric] for s in stats]
     return categories, values
 
 
-def get_category_bar_traces(data):
-    stats = calculate_category_stats(data)
+def get_category_bar_traces(data, primary_category='all', secondary_category='all'):
+    stats = calculate_category_stats(data, primary_category, secondary_category)
     categories = [s['category'] for s in stats]
     avg_likes = [s['avg_likes'] for s in stats]
     avg_comments = [s['avg_comments'] for s in stats]

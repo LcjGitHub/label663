@@ -2,7 +2,7 @@ import dash
 from dash import html, dcc, dash_table, Input, Output, State, no_update
 import plotly.graph_objects as go
 import numpy as np
-from mock_data import get_data_by_period, TIME_PERIOD_DATA, CATEGORIES, CATEGORY_HIERARCHY, VIDEO_CATEGORIES, VIDEO_SECONDARY_CATEGORIES
+from mock_data import get_data_by_period, TIME_PERIOD_DATA, CATEGORIES, VIDEO_CATEGORIES, VIDEO_SECONDARY_CATEGORIES
 from utils import calculate_rankings, format_ranking_items, get_aggregated_trend_data, format_number, calculate_growth_rates, calculate_growth_rankings
 from export_utils import export_data_to_csv
 from category_utils import filter_data_by_category, get_category_summary_rows, get_category_bar_traces, filter_all_periods_by_category, get_secondary_categories
@@ -252,8 +252,8 @@ def create_pie_chart_figure(data):
     return fig
 
 
-def create_category_bar_chart_figure(data):
-    categories, avg_likes, avg_comments, avg_shares = get_category_bar_traces(data)
+def create_category_bar_chart_figure(data, primary_category='all', secondary_category='all'):
+    categories, avg_likes, avg_comments, avg_shares = get_category_bar_traces(data, primary_category, secondary_category)
 
     fig = go.Figure()
 
@@ -1678,8 +1678,8 @@ def update_dashboard(selected_period, primary_category, secondary_category, refr
         video_detail = create_video_detail_card(None, data)
         video_store_value = None
 
-    category_bar_fig = create_category_bar_chart_figure(data)
-    category_summary = get_category_summary_rows(data)
+    category_bar_fig = create_category_bar_chart_figure(data, primary_category, secondary_category)
+    category_summary = get_category_summary_rows(data, primary_category, secondary_category)
 
     last_update_time = data_timer.get_last_update_time()
 
